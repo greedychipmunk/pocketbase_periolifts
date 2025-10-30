@@ -1,27 +1,22 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 
-class SignUpScreen extends StatefulWidget {
-  final AuthService authService;
+class SignUpScreen extends ConsumerStatefulWidget {
   final VoidCallback? onAuthSuccess;
 
-  const SignUpScreen({
-    Key? key,
-    required this.authService,
-    this.onAuthSuccess,
-  }) : super(key: key);
+  const SignUpScreen({Key? key, this.onAuthSuccess}) : super(key: key);
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -35,36 +30,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    try {
-      await widget.authService.signUp(
-        _emailController.text,
-        _passwordController.text,
-        _nameController.text,
-      );
-      
-      if (mounted && widget.onAuthSuccess != null) {
-        widget.onAuthSuccess!();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error signing up: $e')),
+    final result = await ref
+        .read(authProvider.notifier)
+        .signUp(
+          _emailController.text,
+          _passwordController.text,
+          _nameController.text,
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+
+    if (mounted) {
+      if (result.isSuccess) {
+        if (widget.onAuthSuccess != null) {
+          widget.onAuthSuccess!();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error signing up: ${result.error?.message ?? 'Unknown error'}',
+            ),
+          ),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final isLoading = authState.isLoading;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign Up'),
-      ),
+      appBar: AppBar(title: const Text('Sign Up')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -76,10 +73,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               children: [
                 const Text(
                   'Create Account',
-                  style: TextStyle(
-                    fontSize: 28.0,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 28.0, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32.0),
@@ -109,7 +103,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
                     return null;
@@ -153,8 +149,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 24.0),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _signUp,
-                  child: _isLoading
+                  onPressed: isLoading ? null : _signUp,
+                  child: isLoading
                       ? const SizedBox(
                           height: 20,
                           width: 20,
