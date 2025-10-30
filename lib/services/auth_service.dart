@@ -19,7 +19,8 @@ class AuthService {
   final PocketBase _pb;
   User? _currentUser;
 
-  AuthService() : _pb = PocketBaseConfig.instance;
+  AuthService([PocketBase? pocketBaseClient])
+    : _pb = pocketBaseClient ?? PocketBaseConfig.instance;
 
   /// Get currently authenticated user
   User? get currentUser => _currentUser;
