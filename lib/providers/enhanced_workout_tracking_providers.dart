@@ -1,10 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/workout.dart';
 import '../models/workout_history.dart';
 import '../services/workout_service.dart';
 import '../services/auth_service.dart';
 import '../services/workout_history_service.dart';
-import '../providers/workout_tracking_providers.dart';
 import '../state/workout_tracking_state.dart';
 import '../utils/workout_converter.dart';
 
@@ -36,41 +36,34 @@ class EnhancedWorkoutTrackingParams {
 }
 
 /// Enhanced workout tracking provider that saves to workout history
-final enhancedWorkoutTrackingProvider = StateNotifierProvider.family<
-    EnhancedWorkoutTrackingNotifier, 
-    AsyncValue<WorkoutTrackingState>,
-    EnhancedWorkoutTrackingParams
->((ref, params) {
-  return EnhancedWorkoutTrackingNotifier(
-    params.workout,
-    params.workoutService,
-    params.workoutHistoryService,
-    params.authService,
-    params.onAuthError,
-  );
-});
+final enhancedWorkoutTrackingProvider =
+    StateNotifierProvider.family<
+      EnhancedWorkoutTrackingNotifier,
+      AsyncValue<WorkoutTrackingState>,
+      EnhancedWorkoutTrackingParams
+    >((ref, params) {
+      return EnhancedWorkoutTrackingNotifier(
+        params.workout,
+        params.workoutHistoryService,
+      );
+    });
 
 /// Enhanced workout tracking notifier with history saving capabilities
-class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTrackingState>> {
+class EnhancedWorkoutTrackingNotifier
+    extends StateNotifier<AsyncValue<WorkoutTrackingState>> {
   final Workout _originalWorkout;
-  final WorkoutService _workoutService;
   final WorkoutHistoryService _workoutHistoryService;
-  final AuthService _authService;
-  final VoidCallback _onAuthError;
-  
+
   // Track workout timing
   DateTime? _workoutStartTime;
   DateTime? _workoutEndTime;
-  
+
   // Internal state for workout tracking
   late WorkoutTrackingState _currentState;
 
   EnhancedWorkoutTrackingNotifier(
     this._originalWorkout,
-    this._workoutService,
     this._workoutHistoryService,
-    this._authService,
-    this._onAuthError,
   ) : super(const AsyncValue.loading()) {
     _initializeWorkout();
   }
@@ -78,14 +71,22 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   void _initializeWorkout() {
     try {
       _workoutStartTime = DateTime.now();
-      
+
       // Initialize with first exercise selected and exercise selection view
       final initialCompletedSets = _originalWorkout.exercises
-          .map((exercise) => List<bool>.filled(exercise.sets.length, false))
+          .map((exercise) => List<bool>.filled(exercise.sets, false))
           .toList();
 
       final initialModifiedSets = _originalWorkout.exercises
-          .map((exercise) => List<WorkoutSet>.from(exercise.sets))
+          .map(
+            (exercise) => List<WorkoutSet>.generate(
+              exercise.sets,
+              (index) => WorkoutSet(
+                reps: exercise.reps,
+                weight: exercise.weight ?? 0.0,
+              ),
+            ),
+          )
           .toList();
 
       _currentState = WorkoutTrackingState(
@@ -99,7 +100,10 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
         isLoading: false,
         isWorkoutCompleted: false,
         error: null,
-        exerciseStatuses: List.filled(_originalWorkout.exercises.length, ExerciseStatus.notStarted),
+        exerciseStatuses: List.filled(
+          _originalWorkout.exercises.length,
+          ExerciseStatus.notStarted,
+        ),
       );
 
       state = AsyncValue.data(_currentState);
@@ -119,7 +123,7 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   void selectExercise(int exerciseIndex) {
     state.whenData((currentState) {
       final nextSetIndex = _findNextIncompleteSet(exerciseIndex);
-      
+
       _currentState = currentState.copyWith(
         currentView: WorkoutView.exerciseTracking,
         currentExerciseIndex: exerciseIndex,
@@ -127,9 +131,11 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
         selectedSetIndex: nextSetIndex,
       );
       state = AsyncValue.data(_currentState);
-      
+
       // If this is the first set of the exercise (no completed sets), prefill from history
-      final hasCompletedSets = currentState.completedSets[exerciseIndex].any((completed) => completed);
+      final hasCompletedSets = currentState.completedSets[exerciseIndex].any(
+        (completed) => completed,
+      );
       if (!hasCompletedSets && nextSetIndex == 0) {
         // Run prefill asynchronously without blocking the UI
         _prefillNextSet(exerciseIndex, nextSetIndex, null).then((_) {
@@ -161,16 +167,18 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   void onPageChanged(int exerciseIndex) {
     state.whenData((currentState) {
       final nextSetIndex = _findNextIncompleteSet(exerciseIndex);
-      
+
       _currentState = currentState.copyWith(
         currentExerciseIndex: exerciseIndex,
         currentSetIndex: nextSetIndex,
         selectedSetIndex: nextSetIndex,
       );
       state = AsyncValue.data(_currentState);
-      
+
       // If this is the first set of the exercise (no completed sets), prefill from history
-      final hasCompletedSets = currentState.completedSets[exerciseIndex].any((completed) => completed);
+      final hasCompletedSets = currentState.completedSets[exerciseIndex].any(
+        (completed) => completed,
+      );
       if (!hasCompletedSets && nextSetIndex == 0) {
         // Run prefill asynchronously without blocking the UI
         _prefillNextSet(exerciseIndex, nextSetIndex, null).then((_) {
@@ -187,34 +195,41 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
         try {
           final exerciseIndex = currentState.currentExerciseIndex;
           final setIndex = currentState.currentSetIndex;
-          
+
           // Mark set as completed
-          final newCompletedSets = List<List<bool>>.from(_currentState.completedSets);
+          final newCompletedSets = List<List<bool>>.from(
+            _currentState.completedSets,
+          );
           newCompletedSets[exerciseIndex][setIndex] = true;
-          
+
           // Move to next incomplete set
-          final nextSetIndex = _findNextIncompleteSetAfter(exerciseIndex, setIndex, newCompletedSets);
-          
+          final nextSetIndex = _findNextIncompleteSetAfter(
+            exerciseIndex,
+            setIndex,
+            newCompletedSets,
+          );
+
           _currentState = _currentState.copyWith(
             completedSets: newCompletedSets,
             currentSetIndex: nextSetIndex,
             selectedSetIndex: nextSetIndex,
           );
-          
+
           state = AsyncValue.data(_currentState);
-          
+
           // Prefill the next set if it's different from current (meaning there is a next set)
           if (nextSetIndex != setIndex) {
             await _prefillNextSet(exerciseIndex, nextSetIndex, setIndex);
             // Update state after prefilling
             state = AsyncValue.data(_currentState);
           }
-          
+
           // Auto-save progress to history (as in-progress workout)
           await _saveProgressToHistory();
-          
         } catch (e) {
-          _currentState = _currentState.copyWith(error: 'Failed to complete set: $e');
+          _currentState = _currentState.copyWith(
+            error: 'Failed to complete set: $e',
+          );
           state = AsyncValue.data(_currentState);
         }
       },
@@ -229,19 +244,18 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
       data: (currentState) async {
         try {
           _workoutEndTime = DateTime.now();
-          
+
           _currentState = currentState.copyWith(
             isWorkoutCompleted: true,
             isLoading: true,
           );
           state = AsyncValue.data(_currentState);
-          
+
           // Save completed workout to history
           await _saveCompletedWorkoutToHistory();
-          
+
           _currentState = _currentState.copyWith(isLoading: false);
           state = AsyncValue.data(_currentState);
-          
         } catch (e) {
           _currentState = currentState.copyWith(
             error: 'Failed to save workout: $e',
@@ -257,15 +271,24 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   }
 
   // Update weight for a specific set
-  void updateWeightForSet(String weightStr, int setIndex, {int? exerciseIndex}) {
+  void updateWeightForSet(
+    String weightStr,
+    int setIndex, {
+    int? exerciseIndex,
+  }) {
     state.whenData((currentState) {
-      final targetExerciseIndex = exerciseIndex ?? currentState.currentExerciseIndex;
+      final targetExerciseIndex =
+          exerciseIndex ?? currentState.currentExerciseIndex;
       final weight = double.tryParse(weightStr) ?? 0.0;
-      
-      final newModifiedSets = List<List<WorkoutSet>>.from(_currentState.modifiedSets);
-      newModifiedSets[targetExerciseIndex][setIndex] = 
-          newModifiedSets[targetExerciseIndex][setIndex].copyWith(weight: weight);
-      
+
+      final newModifiedSets = List<List<WorkoutSet>>.from(
+        _currentState.modifiedSets,
+      );
+      newModifiedSets[targetExerciseIndex][setIndex] =
+          newModifiedSets[targetExerciseIndex][setIndex].copyWith(
+            weight: weight,
+          );
+
       _currentState = _currentState.copyWith(modifiedSets: newModifiedSets);
       state = AsyncValue.data(_currentState);
     });
@@ -274,13 +297,16 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   // Update reps for a specific set
   void updateRepsForSet(String repsStr, int setIndex, {int? exerciseIndex}) {
     state.whenData((currentState) {
-      final targetExerciseIndex = exerciseIndex ?? currentState.currentExerciseIndex;
+      final targetExerciseIndex =
+          exerciseIndex ?? currentState.currentExerciseIndex;
       final reps = int.tryParse(repsStr) ?? 0;
-      
-      final newModifiedSets = List<List<WorkoutSet>>.from(_currentState.modifiedSets);
-      newModifiedSets[targetExerciseIndex][setIndex] = 
+
+      final newModifiedSets = List<List<WorkoutSet>>.from(
+        _currentState.modifiedSets,
+      );
+      newModifiedSets[targetExerciseIndex][setIndex] =
           newModifiedSets[targetExerciseIndex][setIndex].copyWith(reps: reps);
-      
+
       _currentState = _currentState.copyWith(modifiedSets: newModifiedSets);
       state = AsyncValue.data(_currentState);
     });
@@ -291,11 +317,16 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
     state.whenData((currentState) {
       final exerciseIndex = currentState.currentExerciseIndex;
       final setIndex = currentState.currentSetIndex;
-      
-      final currentWeight = _currentState.modifiedSets[exerciseIndex][setIndex].weight;
+
+      final currentWeight =
+          _currentState.modifiedSets[exerciseIndex][setIndex].weight;
       final newWeight = (currentWeight + delta).clamp(0.0, 999.0);
-      
-      updateWeightForSet(newWeight.toString(), setIndex, exerciseIndex: exerciseIndex);
+
+      updateWeightForSet(
+        newWeight.toString(),
+        setIndex,
+        exerciseIndex: exerciseIndex,
+      );
     });
   }
 
@@ -304,11 +335,16 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
     state.whenData((currentState) {
       final exerciseIndex = currentState.currentExerciseIndex;
       final setIndex = currentState.currentSetIndex;
-      
-      final currentReps = _currentState.modifiedSets[exerciseIndex][setIndex].reps;
+
+      final currentReps =
+          _currentState.modifiedSets[exerciseIndex][setIndex].reps;
       final newReps = (currentReps + delta).clamp(1, 999);
-      
-      updateRepsForSet(newReps.toString(), setIndex, exerciseIndex: exerciseIndex);
+
+      updateRepsForSet(
+        newReps.toString(),
+        setIndex,
+        exerciseIndex: exerciseIndex,
+      );
     });
   }
 
@@ -320,16 +356,21 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
         _currentState,
         workoutDuration,
       );
-      
+
       // Check if entry already exists (update) or create new
-      final existingEntries = await _workoutHistoryService.getWorkoutHistory(
-        workoutName: _originalWorkout.name,
-        startDate: _workoutStartTime?.subtract(const Duration(hours: 1)),
-        endDate: DateTime.now(),
-        limit: 1,
-      );
-      
-      if (existingEntries.isNotEmpty && existingEntries.first.status == WorkoutHistoryStatus.inProgress) {
+      final existingEntriesResult = await _workoutHistoryService
+          .getWorkoutHistory(
+            workoutName: _originalWorkout.name,
+            startDate: _workoutStartTime?.subtract(const Duration(hours: 1)),
+            endDate: DateTime.now(),
+            page: 1,
+            perPage: 1,
+          );
+
+      final existingEntries = existingEntriesResult.getOrThrow();
+
+      if (existingEntries.isNotEmpty &&
+          existingEntries.first.status == WorkoutHistoryStatus.inProgress) {
         // Update existing in-progress workout
         final updatedEntry = existingEntries.first.copyWith(
           duration: workoutDuration,
@@ -338,7 +379,10 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
           totalReps: historyEntry.totalReps,
           totalWeightLifted: historyEntry.totalWeightLifted,
         );
-        await _workoutHistoryService.updateWorkoutHistory(updatedEntry);
+        await _workoutHistoryService.updateWorkoutHistory(
+          updatedEntry.id,
+          updatedEntry,
+        );
       } else {
         // Create new in-progress workout
         await _workoutHistoryService.createWorkoutHistory(historyEntry);
@@ -357,16 +401,21 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
         _currentState,
         workoutDuration,
       );
-      
+
       // Check if an in-progress version exists
-      final existingEntries = await _workoutHistoryService.getWorkoutHistory(
-        workoutName: _originalWorkout.name,
-        startDate: _workoutStartTime?.subtract(const Duration(hours: 1)),
-        endDate: DateTime.now(),
-        limit: 1,
-      );
-      
-      if (existingEntries.isNotEmpty && existingEntries.first.status == WorkoutHistoryStatus.inProgress) {
+      final existingEntriesResult = await _workoutHistoryService
+          .getWorkoutHistory(
+            workoutName: _originalWorkout.name,
+            startDate: _workoutStartTime?.subtract(const Duration(hours: 1)),
+            endDate: DateTime.now(),
+            page: 1,
+            perPage: 1,
+          );
+
+      final existingEntries = existingEntriesResult.getOrThrow();
+
+      if (existingEntries.isNotEmpty &&
+          existingEntries.first.status == WorkoutHistoryStatus.inProgress) {
         // Update existing in-progress workout to completed
         final completedEntry = existingEntries.first.copyWith(
           status: WorkoutHistoryStatus.completed,
@@ -377,21 +426,17 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
           totalReps: historyEntry.totalReps,
           totalWeightLifted: historyEntry.totalWeightLifted,
         );
-        await _workoutHistoryService.updateWorkoutHistory(completedEntry);
+        await _workoutHistoryService.updateWorkoutHistory(
+          completedEntry.id,
+          completedEntry,
+        );
       } else {
         // Create new completed workout entry
         await _workoutHistoryService.createWorkoutHistory(historyEntry);
       }
-      
-      // Also update the original workout record if needed
-      if (!_originalWorkout.isCompleted) {
-        final completedWorkout = _originalWorkout.copyWith(
-          isCompleted: true,
-          completedDate: DateTime.now(),
-        );
-        await _workoutService.updateWorkout(completedWorkout);
-      }
-      
+
+      // Note: Workout model doesn't track completion status, only the workout history does
+      // The workout template remains unchanged regardless of completion
     } catch (e) {
       print('Error saving completed workout: $e');
       throw Exception('Failed to save workout to history: $e');
@@ -402,7 +447,7 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   int _findNextIncompleteSet(int exerciseIndex) {
     final completedSets = _currentState.completedSets;
     if (exerciseIndex >= completedSets.length) return 0;
-    
+
     for (int i = 0; i < completedSets[exerciseIndex].length; i++) {
       if (!completedSets[exerciseIndex][i]) return i;
     }
@@ -410,29 +455,36 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
   }
 
   /// Get the last completed values for an exercise from workout history
-  Future<Map<String, dynamic>?> _getLastExerciseValues(String exerciseId, String exerciseName) async {
+  Future<Map<String, dynamic>?> _getLastExerciseValues(
+    String exerciseId,
+    String exerciseName,
+  ) async {
     try {
       // Get recent workout history entries
-      final historyEntries = await _workoutHistoryService.getWorkoutHistory(
-        limit: 20,
-        status: WorkoutHistoryStatus.completed,
-      );
-      
+      final historyEntriesResult = await _workoutHistoryService
+          .getWorkoutHistory(
+            page: 1,
+            perPage: 20,
+            status: WorkoutHistoryStatus.completed,
+          );
+
+      final historyEntries = historyEntriesResult.getOrThrow();
+
       // Find the most recent entry that contains this exercise with completed sets
       for (final entry in historyEntries) {
         try {
           final exerciseHistory = entry.exercises.firstWhere(
-            (ex) => ex.exerciseId == exerciseId || ex.exerciseName == exerciseName,
+            (WorkoutHistoryExercise ex) =>
+                ex.exerciseId == exerciseId || ex.exerciseName == exerciseName,
           );
-          
+
           // Find the last completed set
-          final completedSets = exerciseHistory.sets.where((set) => set.completed).toList();
+          final completedSets = exerciseHistory.sets
+              .where((WorkoutHistorySet set) => set.completed)
+              .toList();
           if (completedSets.isNotEmpty) {
             final lastSet = completedSets.last;
-            return {
-              'reps': lastSet.reps,
-              'weight': lastSet.weight,
-            };
+            return {'reps': lastSet.reps, 'weight': lastSet.weight};
           }
         } catch (e) {
           // Exercise not found in this entry, continue to next entry
@@ -448,97 +500,141 @@ class EnhancedWorkoutTrackingNotifier extends StateNotifier<AsyncValue<WorkoutTr
 
   /// Prefill a set with weight and reps values
   void _prefillSet(int exerciseIndex, int setIndex, int reps, double weight) {
-    final newModifiedSets = List<List<WorkoutSet>>.from(_currentState.modifiedSets);
-    
-    if (exerciseIndex < newModifiedSets.length && setIndex < newModifiedSets[exerciseIndex].length) {
+    final newModifiedSets = List<List<WorkoutSet>>.from(
+      _currentState.modifiedSets,
+    );
+
+    if (exerciseIndex < newModifiedSets.length &&
+        setIndex < newModifiedSets[exerciseIndex].length) {
       final currentSet = newModifiedSets[exerciseIndex][setIndex];
-      newModifiedSets[exerciseIndex] = List<WorkoutSet>.from(newModifiedSets[exerciseIndex]);
+      newModifiedSets[exerciseIndex] = List<WorkoutSet>.from(
+        newModifiedSets[exerciseIndex],
+      );
       newModifiedSets[exerciseIndex][setIndex] = WorkoutSet(
         reps: reps,
         weight: weight,
         restTime: currentSet.restTime,
       );
-      
+
       _currentState = _currentState.copyWith(modifiedSets: newModifiedSets);
     }
   }
 
   /// Prefill the next set with values from last completed set or workout history
-  Future<void> _prefillNextSet(int exerciseIndex, int nextSetIndex, int? lastCompletedSetIndex) async {
+  Future<void> _prefillNextSet(
+    int exerciseIndex,
+    int nextSetIndex,
+    int? lastCompletedSetIndex,
+  ) async {
     if (exerciseIndex >= _currentState.workout.exercises.length) return;
-    
+
     final exercise = _currentState.workout.exercises[exerciseIndex];
     int? prefilledReps;
     double? prefilledWeight;
-    
+
     // First, try to get values from the last completed set in current workout
     if (lastCompletedSetIndex != null && lastCompletedSetIndex >= 0) {
-      final lastCompletedSet = _currentState.modifiedSets[exerciseIndex][lastCompletedSetIndex];
+      final lastCompletedSet =
+          _currentState.modifiedSets[exerciseIndex][lastCompletedSetIndex];
       prefilledReps = lastCompletedSet.reps;
       prefilledWeight = lastCompletedSet.weight;
-      print('Prefilling set $nextSetIndex with values from last completed set: $prefilledReps reps, ${prefilledWeight}kg');
+      print(
+        'Prefilling set $nextSetIndex with values from last completed set: $prefilledReps reps, ${prefilledWeight}kg',
+      );
     } else {
       // If it's the first set of the exercise, get values from workout history
-      final lastValues = await _getLastExerciseValues(exercise.exerciseId, exercise.exerciseName);
+      final lastValues = await _getLastExerciseValues(
+        exercise.exerciseId,
+        exercise.exerciseName,
+      );
       if (lastValues != null) {
         prefilledReps = lastValues['reps'] as int?;
         prefilledWeight = lastValues['weight'] as double?;
-        print('Prefilling first set with values from workout history: $prefilledReps reps, ${prefilledWeight}kg');
+        print(
+          'Prefilling first set with values from workout history: $prefilledReps reps, ${prefilledWeight}kg',
+        );
       }
     }
-    
+
     // Apply the prefilled values if we found any
     if (prefilledReps != null && prefilledWeight != null) {
       _prefillSet(exerciseIndex, nextSetIndex, prefilledReps, prefilledWeight);
     }
   }
 
-  int _findNextIncompleteSetAfter(int exerciseIndex, int currentSetIndex, List<List<bool>> completedSets) {
+  int _findNextIncompleteSetAfter(
+    int exerciseIndex,
+    int currentSetIndex,
+    List<List<bool>> completedSets,
+  ) {
     if (exerciseIndex >= completedSets.length) return 0;
-    
-    for (int i = currentSetIndex + 1; i < completedSets[exerciseIndex].length; i++) {
+
+    for (
+      int i = currentSetIndex + 1;
+      i < completedSets[exerciseIndex].length;
+      i++
+    ) {
       if (!completedSets[exerciseIndex][i]) return i;
     }
-    
+
     // All sets completed in this exercise, return last set index
     return completedSets[exerciseIndex].length - 1;
   }
 }
 
 // Helper providers for the enhanced tracking
-final enhancedWorkoutProgressProvider = Provider.family<double, EnhancedWorkoutTrackingParams>((ref, params) {
-  return ref.watch(enhancedWorkoutTrackingProvider(params)).when(
-    data: (state) {
-      final totalSets = state.workout.exercises.fold(0, (sum, exercise) => sum + exercise.sets.length);
-      if (totalSets == 0) return 0.0;
-      
-      final completedSets = state.completedSets.fold(0, (sum, exerciseSets) => 
-          sum + exerciseSets.where((completed) => completed).length);
-      
-      return completedSets / totalSets;
-    },
-    loading: () => 0.0,
-    error: (_, __) => 0.0,
-  );
-});
+final enhancedWorkoutProgressProvider =
+    Provider.family<double, EnhancedWorkoutTrackingParams>((ref, params) {
+      return ref
+          .watch(enhancedWorkoutTrackingProvider(params))
+          .when(
+            data: (state) {
+              final totalSets = state.workout.exercises.fold(
+                0,
+                (sum, exercise) => sum + exercise.sets,
+              );
+              if (totalSets == 0) return 0.0;
 
-final enhancedWorkoutAllExercisesCompletedProvider = Provider.family<bool, EnhancedWorkoutTrackingParams>((ref, params) {
-  return ref.watch(enhancedWorkoutTrackingProvider(params)).when(
-    data: (state) {
-      return state.completedSets.every((exerciseSets) => exerciseSets.every((completed) => completed));
-    },
-    loading: () => false,
-    error: (_, __) => false,
-  );
-});
+              final completedSets = state.completedSets.fold(
+                0,
+                (sum, exerciseSets) =>
+                    sum + exerciseSets.where((completed) => completed).length,
+              );
 
-final enhancedWorkoutDurationProvider = Provider.family<Duration, EnhancedWorkoutTrackingParams>((ref, params) {
-  return ref.watch(enhancedWorkoutTrackingProvider(params)).when(
-    data: (state) {
-      final notifier = ref.read(enhancedWorkoutTrackingProvider(params).notifier);
-      return notifier.workoutDuration;
-    },
-    loading: () => Duration.zero,
-    error: (_, __) => Duration.zero,
-  );
-});
+              return completedSets / totalSets;
+            },
+            loading: () => 0.0,
+            error: (_, __) => 0.0,
+          );
+    });
+
+final enhancedWorkoutAllExercisesCompletedProvider =
+    Provider.family<bool, EnhancedWorkoutTrackingParams>((ref, params) {
+      return ref
+          .watch(enhancedWorkoutTrackingProvider(params))
+          .when(
+            data: (state) {
+              return state.completedSets.every(
+                (exerciseSets) => exerciseSets.every((completed) => completed),
+              );
+            },
+            loading: () => false,
+            error: (_, __) => false,
+          );
+    });
+
+final enhancedWorkoutDurationProvider =
+    Provider.family<Duration, EnhancedWorkoutTrackingParams>((ref, params) {
+      return ref
+          .watch(enhancedWorkoutTrackingProvider(params))
+          .when(
+            data: (state) {
+              final notifier = ref.read(
+                enhancedWorkoutTrackingProvider(params).notifier,
+              );
+              return notifier.workoutDuration;
+            },
+            loading: () => Duration.zero,
+            error: (_, __) => Duration.zero,
+          );
+    });

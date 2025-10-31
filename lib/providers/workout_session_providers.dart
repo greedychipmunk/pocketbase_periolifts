@@ -1,23 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:appwrite/appwrite.dart';
 import '../models/workout_session.dart';
 import '../services/workout_session_service.dart';
 
 // Service provider
 final workoutSessionServiceProvider = Provider<WorkoutSessionService>((ref) {
-  throw UnimplementedError('WorkoutSessionService provider must be overridden');
+  return WorkoutSessionService();
 });
 
 // Active workout session provider
-final activeWorkoutSessionProvider = StateNotifierProvider<ActiveWorkoutSessionNotifier, AsyncValue<WorkoutSession?>>((ref) {
-  final service = ref.watch(workoutSessionServiceProvider);
-  return ActiveWorkoutSessionNotifier(service);
-});
+final activeWorkoutSessionProvider =
+    StateNotifierProvider<
+      ActiveWorkoutSessionNotifier,
+      AsyncValue<WorkoutSession?>
+    >((ref) {
+      final service = ref.watch(workoutSessionServiceProvider);
+      return ActiveWorkoutSessionNotifier(service);
+    });
 
-class ActiveWorkoutSessionNotifier extends StateNotifier<AsyncValue<WorkoutSession?>> {
+class ActiveWorkoutSessionNotifier
+    extends StateNotifier<AsyncValue<WorkoutSession?>> {
   final WorkoutSessionService _service;
 
-  ActiveWorkoutSessionNotifier(this._service) : super(const AsyncValue.loading()) {
+  ActiveWorkoutSessionNotifier(this._service)
+    : super(const AsyncValue.loading()) {
     _loadActiveSession();
   }
 
@@ -59,9 +64,19 @@ class ActiveWorkoutSessionNotifier extends StateNotifier<AsyncValue<WorkoutSessi
     }
   }
 
-  Future<void> updateSet(String sessionId, String exerciseId, String setId, WorkoutSessionSet updatedSet) async {
+  Future<void> updateSet(
+    String sessionId,
+    String exerciseId,
+    String setId,
+    WorkoutSessionSet updatedSet,
+  ) async {
     try {
-      final updatedSession = await _service.updateSetData(sessionId, exerciseId, setId, updatedSet);
+      final updatedSession = await _service.updateSetData(
+        sessionId,
+        exerciseId,
+        setId,
+        updatedSet,
+      );
       state = AsyncValue.data(updatedSession);
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -74,10 +89,15 @@ class ActiveWorkoutSessionNotifier extends StateNotifier<AsyncValue<WorkoutSessi
 }
 
 // Workout sessions list provider with pagination
-final workoutSessionsProvider = StateNotifierProvider.family<WorkoutSessionsNotifier, AsyncValue<List<WorkoutSession>>, WorkoutSessionsFilter>((ref, filter) {
-  final service = ref.watch(workoutSessionServiceProvider);
-  return WorkoutSessionsNotifier(service, filter);
-});
+final workoutSessionsProvider =
+    StateNotifierProvider.family<
+      WorkoutSessionsNotifier,
+      AsyncValue<List<WorkoutSession>>,
+      WorkoutSessionsFilter
+    >((ref, filter) {
+      final service = ref.watch(workoutSessionServiceProvider);
+      return WorkoutSessionsNotifier(service, filter);
+    });
 
 class WorkoutSessionsFilter {
   final WorkoutSessionStatus? status;
@@ -131,14 +151,16 @@ class WorkoutSessionsFilter {
   }
 }
 
-class WorkoutSessionsNotifier extends StateNotifier<AsyncValue<List<WorkoutSession>>> {
+class WorkoutSessionsNotifier
+    extends StateNotifier<AsyncValue<List<WorkoutSession>>> {
   final WorkoutSessionService _service;
   final WorkoutSessionsFilter _filter;
   List<WorkoutSession> _sessions = [];
   bool _hasMore = true;
   bool _isLoading = false;
 
-  WorkoutSessionsNotifier(this._service, this._filter) : super(const AsyncValue.loading()) {
+  WorkoutSessionsNotifier(this._service, this._filter)
+    : super(const AsyncValue.loading()) {
     _loadInitialSessions();
   }
 
@@ -147,8 +169,8 @@ class WorkoutSessionsNotifier extends StateNotifier<AsyncValue<List<WorkoutSessi
       _sessions.clear();
       _hasMore = true;
       final sessions = await _service.getWorkoutSessions(
-        limit: _filter.limit,
-        offset: 0,
+        page: 1,
+        perPage: _filter.limit,
         status: _filter.status,
         startDate: _filter.startDate,
         endDate: _filter.endDate,
@@ -167,13 +189,13 @@ class WorkoutSessionsNotifier extends StateNotifier<AsyncValue<List<WorkoutSessi
     _isLoading = true;
     try {
       final moreSessions = await _service.getWorkoutSessions(
-        limit: _filter.limit,
-        offset: _sessions.length,
+        page: (_sessions.length ~/ _filter.limit) + 1,
+        perPage: _filter.limit,
         status: _filter.status,
         startDate: _filter.startDate,
         endDate: _filter.endDate,
       );
-      
+
       _sessions.addAll(moreSessions);
       _hasMore = moreSessions.length >= _filter.limit;
       state = AsyncValue.data(_sessions);
@@ -201,7 +223,7 @@ class WorkoutSessionsNotifier extends StateNotifier<AsyncValue<List<WorkoutSessi
   Future<void> deleteSession(String sessionId) async {
     try {
       await _service.deleteWorkoutSession(sessionId);
-      _sessions.removeWhere((session) => session.sessionId == sessionId);
+      _sessions.removeWhere((session) => session.id == sessionId);
       state = AsyncValue.data(_sessions);
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -213,16 +235,22 @@ class WorkoutSessionsNotifier extends StateNotifier<AsyncValue<List<WorkoutSessi
 }
 
 // Workout session detail provider
-final workoutSessionProvider = StateNotifierProvider.family<WorkoutSessionNotifier, AsyncValue<WorkoutSession>, String>((ref, sessionId) {
-  final service = ref.watch(workoutSessionServiceProvider);
-  return WorkoutSessionNotifier(service, sessionId);
-});
+final workoutSessionProvider =
+    StateNotifierProvider.family<
+      WorkoutSessionNotifier,
+      AsyncValue<WorkoutSession>,
+      String
+    >((ref, sessionId) {
+      final service = ref.watch(workoutSessionServiceProvider);
+      return WorkoutSessionNotifier(service, sessionId);
+    });
 
 class WorkoutSessionNotifier extends StateNotifier<AsyncValue<WorkoutSession>> {
   final WorkoutSessionService _service;
   final String _sessionId;
 
-  WorkoutSessionNotifier(this._service, this._sessionId) : super(const AsyncValue.loading()) {
+  WorkoutSessionNotifier(this._service, this._sessionId)
+    : super(const AsyncValue.loading()) {
     _loadSession();
   }
 
@@ -262,9 +290,18 @@ class WorkoutSessionNotifier extends StateNotifier<AsyncValue<WorkoutSession>> {
     }
   }
 
-  Future<void> updateSet(String exerciseId, String setId, WorkoutSessionSet updatedSet) async {
+  Future<void> updateSet(
+    String exerciseId,
+    String setId,
+    WorkoutSessionSet updatedSet,
+  ) async {
     try {
-      final updatedSession = await _service.updateSetData(_sessionId, exerciseId, setId, updatedSet);
+      final updatedSession = await _service.updateSetData(
+        _sessionId,
+        exerciseId,
+        setId,
+        updatedSet,
+      );
       state = AsyncValue.data(updatedSession);
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -277,24 +314,23 @@ class WorkoutSessionNotifier extends StateNotifier<AsyncValue<WorkoutSession>> {
 }
 
 // Workout statistics provider
-final workoutStatsProvider = StateNotifierProvider.family<WorkoutStatsNotifier, AsyncValue<WorkoutSessionStats>, WorkoutStatsFilter>((ref, filter) {
-  final service = ref.watch(workoutSessionServiceProvider);
-  return WorkoutStatsNotifier(service, filter);
-});
+final workoutStatsProvider =
+    StateNotifierProvider.family<
+      WorkoutStatsNotifier,
+      AsyncValue<WorkoutSessionStats>,
+      WorkoutStatsFilter
+    >((ref, filter) {
+      final service = ref.watch(workoutSessionServiceProvider);
+      return WorkoutStatsNotifier(service, filter);
+    });
 
 class WorkoutStatsFilter {
   final DateTime? startDate;
   final DateTime? endDate;
 
-  const WorkoutStatsFilter({
-    this.startDate,
-    this.endDate,
-  });
+  const WorkoutStatsFilter({this.startDate, this.endDate});
 
-  WorkoutStatsFilter copyWith({
-    DateTime? startDate,
-    DateTime? endDate,
-  }) {
+  WorkoutStatsFilter copyWith({DateTime? startDate, DateTime? endDate}) {
     return WorkoutStatsFilter(
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
@@ -315,11 +351,13 @@ class WorkoutStatsFilter {
   }
 }
 
-class WorkoutStatsNotifier extends StateNotifier<AsyncValue<WorkoutSessionStats>> {
+class WorkoutStatsNotifier
+    extends StateNotifier<AsyncValue<WorkoutSessionStats>> {
   final WorkoutSessionService _service;
   final WorkoutStatsFilter _filter;
 
-  WorkoutStatsNotifier(this._service, this._filter) : super(const AsyncValue.loading()) {
+  WorkoutStatsNotifier(this._service, this._filter)
+    : super(const AsyncValue.loading()) {
     _loadStats();
   }
 
@@ -342,10 +380,15 @@ class WorkoutStatsNotifier extends StateNotifier<AsyncValue<WorkoutSessionStats>
 }
 
 // Workout history provider
-final workoutHistoryProvider = StateNotifierProvider.family<WorkoutHistoryNotifier, AsyncValue<List<WorkoutSession>>, WorkoutHistoryFilter>((ref, filter) {
-  final service = ref.watch(workoutSessionServiceProvider);
-  return WorkoutHistoryNotifier(service, filter);
-});
+final workoutHistoryProvider =
+    StateNotifierProvider.family<
+      WorkoutHistoryNotifier,
+      AsyncValue<List<WorkoutSession>>,
+      WorkoutHistoryFilter
+    >((ref, filter) {
+      final service = ref.watch(workoutSessionServiceProvider);
+      return WorkoutHistoryNotifier(service, filter);
+    });
 
 class WorkoutHistoryFilter {
   final DateTime? startDate;
@@ -393,14 +436,16 @@ class WorkoutHistoryFilter {
   }
 }
 
-class WorkoutHistoryNotifier extends StateNotifier<AsyncValue<List<WorkoutSession>>> {
+class WorkoutHistoryNotifier
+    extends StateNotifier<AsyncValue<List<WorkoutSession>>> {
   final WorkoutSessionService _service;
   final WorkoutHistoryFilter _filter;
   List<WorkoutSession> _history = [];
   bool _hasMore = true;
   bool _isLoading = false;
 
-  WorkoutHistoryNotifier(this._service, this._filter) : super(const AsyncValue.loading()) {
+  WorkoutHistoryNotifier(this._service, this._filter)
+    : super(const AsyncValue.loading()) {
     _loadHistory();
   }
 
@@ -409,8 +454,8 @@ class WorkoutHistoryNotifier extends StateNotifier<AsyncValue<List<WorkoutSessio
       _history.clear();
       _hasMore = true;
       final sessions = await _service.getWorkoutHistory(
-        limit: _filter.limit,
-        offset: 0,
+        page: 1,
+        perPage: _filter.limit,
         startDate: _filter.startDate,
         endDate: _filter.endDate,
       );
@@ -428,12 +473,12 @@ class WorkoutHistoryNotifier extends StateNotifier<AsyncValue<List<WorkoutSessio
     _isLoading = true;
     try {
       final moreHistory = await _service.getWorkoutHistory(
-        limit: _filter.limit,
-        offset: _history.length,
+        page: (_history.length ~/ _filter.limit) + 1,
+        perPage: _filter.limit,
         startDate: _filter.startDate,
         endDate: _filter.endDate,
       );
-      
+
       _history.addAll(moreHistory);
       _hasMore = moreHistory.length >= _filter.limit;
       state = AsyncValue.data(_history);
