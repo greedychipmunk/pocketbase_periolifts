@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../models/user.dart';
+import '../utils/validators.dart';
 import 'sign_up_screen.dart';
 import '../constants/app_constants.dart';
 
@@ -35,19 +37,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final result = await ref
         .read(authProvider.notifier)
-        .signIn(_emailController.text, _passwordController.text);
+        .signIn(_emailController.text.trim(), _passwordController.text);
 
     if (mounted) {
       if (result.isSuccess) {
-        if (widget.onAuthSuccess != null) {
-          widget.onAuthSuccess!();
+        final user = result.data!;
+
+        // Check if email verification is required
+        if (!user.emailVerified) {
+          _showEmailVerificationDialog(user);
+        } else {
+          if (widget.onAuthSuccess != null) {
+            widget.onAuthSuccess!();
+          }
         }
+      } else {
+        _handleSignInError(result.error!.message);
+      }
+    }
+  }
+
+  void _handleSignInError(String errorMessage) {
+    String userFriendlyMessage = errorMessage;
+
+    // Convert PocketBase errors to user-friendly messages
+    if (errorMessage.toLowerCase().contains('invalid credentials') ||
+        errorMessage.toLowerCase().contains('wrong email or password')) {
+      userFriendlyMessage =
+          'Invalid email or password. Please check your credentials and try again.';
+    } else if (errorMessage.toLowerCase().contains('user not found')) {
+      userFriendlyMessage =
+          'No account found with this email address. Please sign up first.';
+    } else if (errorMessage.toLowerCase().contains('network') ||
+        errorMessage.toLowerCase().contains('connection')) {
+      userFriendlyMessage =
+          'Network error. Please check your internet connection and try again.';
+    } else if (errorMessage.toLowerCase().contains('rate limit')) {
+      userFriendlyMessage =
+          'Too many login attempts. Please wait a moment and try again.';
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(userFriendlyMessage),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Theme.of(context).colorScheme.onError,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showEmailVerificationDialog(User user) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Email Verification Required'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Please verify your email address (${user.email}) to continue.',
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Check your inbox for a verification email and click the link to verify your account.',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                ref.read(authProvider.notifier).signOut();
+              },
+              child: const Text('Sign Out'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _resendEmailVerification();
+              },
+              child: const Text('Resend Email'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                if (widget.onAuthSuccess != null) {
+                  widget.onAuthSuccess!();
+                }
+              },
+              child: const Text('Continue Anyway'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _resendEmailVerification() async {
+    final result = await ref
+        .read(authProvider.notifier)
+        .sendEmailVerification();
+
+    if (mounted) {
+      if (result.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Verification email sent! Please check your inbox.',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Error signing in: ${result.error?.message ?? 'Unknown error'}',
+              'Failed to send verification email: ${result.error?.message}',
             ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -162,9 +281,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ).colorScheme.surfaceContainerHighest,
                           ),
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
+                            if (value == null || value.trim().isEmpty) {
                               return 'Please enter your email';
+                            }
+                            if (!Validators.isValidEmail(value.trim())) {
+                              return 'Please enter a valid email address';
                             }
                             return null;
                           },
@@ -200,9 +323,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ).colorScheme.surfaceContainerHighest,
                           ),
                           obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _signIn(),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your password';
+                            }
+                            if (value.length < 8) {
+                              return 'Password must be at least 8 characters';
                             }
                             return null;
                           },
