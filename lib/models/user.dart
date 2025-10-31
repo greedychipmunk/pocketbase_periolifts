@@ -1,3 +1,4 @@
+import 'package:pocketbase/pocketbase.dart';
 import '../utils/validators.dart';
 import '../utils/error_handler.dart';
 import 'base_model.dart';
@@ -160,6 +161,69 @@ class User extends BasePocketBaseModel {
         originalError: e,
         fieldErrors: {'json': 'Invalid user data format'},
       );
+    }
+  }
+
+  /// Create User from PocketBase RecordModel
+  ///
+  /// This is the preferred method for creating User instances from PocketBase
+  /// responses as it leverages the RecordModel's built-in data access methods
+  /// and provides better type safety.
+  factory User.fromRecord(RecordModel record) {
+    try {
+      return User(
+        id: record.id,
+        created: _parseDate(record.created) ?? DateTime.now(),
+        updated: _parseDate(record.updated) ?? DateTime.now(),
+        email: record.get<String>('email', ''),
+        name: record.get<String>('name', ''),
+        username: record.get<String>('username', ''),
+        avatarUrl: record.get<String>('avatar'),
+        emailVerified: record.get<bool>('emailVisibility', false),
+        preferredUnits: record.get<String>('preferredUnits', 'metric'),
+        preferredTheme: record.get<String>('preferredTheme', 'system'),
+        timezone: record.get<String>('timezone', 'UTC'),
+        onboardingCompleted: record.get<bool>('onboardingCompleted', false),
+        fitnessGoals: record.get<String>('fitnessGoals'),
+        currentCyclePhase: record.get<String>('currentCyclePhase'),
+        averageCycleLength: record.get<int>('averageCycleLength'),
+        birthDate: _parseDate(record.get<String>('birthDate')),
+        height: record.get<double>('height'),
+        weight: record.get<double>('weight'),
+        activityLevel: record.get<String>('activityLevel'),
+        notificationsEnabled: record.get<bool>('notificationsEnabled', true),
+        workoutRemindersEnabled: record.get<bool>(
+          'workoutRemindersEnabled',
+          true,
+        ),
+        periodRemindersEnabled: record.get<bool>(
+          'periodRemindersEnabled',
+          true,
+        ),
+        subscriptionStatus: record.get<String>('subscriptionStatus', 'free'),
+        subscriptionExpiresAt: _parseDate(
+          record.get<String>('subscriptionExpiresAt'),
+        ),
+        role: record.get<String>('role', 'user'),
+        isActive: record.get<bool>('isActive', true),
+        lastActiveAt: _parseDate(record.get<String>('lastActiveAt')),
+      );
+    } catch (e) {
+      throw ValidationException(
+        'Failed to create User from RecordModel',
+        originalError: e,
+        fieldErrors: {'record': 'Invalid record data format'},
+      );
+    }
+  }
+
+  /// Helper method to safely parse date strings
+  static DateTime? _parseDate(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return null;
+    try {
+      return DateTime.parse(dateString);
+    } catch (e) {
+      return null;
     }
   }
 

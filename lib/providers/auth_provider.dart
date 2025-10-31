@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../utils/result.dart';
 
 /// Auth state that tracks authentication status and user data
+/// Enhanced to work directly with PocketBase AuthStore
 class AuthState {
   final User? user;
   final bool isLoading;
@@ -56,34 +58,74 @@ class AuthState {
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 /// Auth state provider that manages authentication state
+/// Enhanced to integrate directly with PocketBase AuthStore
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.read(authServiceProvider);
   return AuthNotifier(authService);
 });
 
-/// Auth notifier that manages authentication operations
+/// Auth notifier that manages authentication operations using PocketBase AuthStore
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
+  StreamSubscription<dynamic>? _authStoreSubscription;
 
   AuthNotifier(this._authService) : super(const AuthState()) {
+    _initializeAuthStoreListener();
     _restoreSession();
   }
 
-  /// Restore session from stored auth data on app startup
+  @override
+  void dispose() {
+    _authStoreSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Initialize listener for PocketBase AuthStore changes
+  /// This replaces custom state management with direct AuthStore integration
+  void _initializeAuthStoreListener() {
+    // Get the PocketBase instance from AuthService
+    final pocketBaseClient = _authService.pocketBaseClient;
+
+    // Listen to AuthStore changes and update our state accordingly
+    _authStoreSubscription = pocketBaseClient.authStore.onChange.listen((
+      authStoreEvent,
+    ) {
+      _updateStateFromAuthStore();
+    });
+  }
+
+  /// Update our state based on current PocketBase AuthStore state
+  void _updateStateFromAuthStore() {
+    final pocketBaseClient = _authService.pocketBaseClient;
+    final authStore = pocketBaseClient.authStore;
+
+    try {
+      if (authStore.isValid && authStore.record != null) {
+        // Convert PocketBase record to User model
+        final user = User.fromRecord(authStore.record!);
+        state = state.copyWith(user: user, isAuthenticated: true, error: null);
+      } else {
+        // No valid authentication
+        state = state.copyWith(user: null, isAuthenticated: false, error: null);
+      }
+    } catch (e) {
+      state = state.copyWith(
+        user: null,
+        isAuthenticated: false,
+        error: 'Failed to parse auth data: $e',
+      );
+    }
+  }
+
+  /// Restore session from PocketBase AuthStore on app startup
   Future<void> _restoreSession() async {
     state = state.copyWith(isLoading: true);
 
     try {
       await _authService.restoreSession();
-      final user = _authService.currentUser;
-      final isAuthenticated = _authService.isAuthenticated;
+      _updateStateFromAuthStore();
 
-      state = state.copyWith(
-        user: user,
-        isAuthenticated: isAuthenticated,
-        isLoading: false,
-        error: null,
-      );
+      state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(
         user: null,
@@ -95,6 +137,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Sign in with email and password
+  /// PocketBase AuthStore automatically manages auth state
   Future<Result<User>> signIn(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -102,16 +145,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.signIn(email, password);
 
       if (result.isSuccess) {
-        state = state.copyWith(
-          user: result.data,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        );
+        // AuthStore listener will automatically update state
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
-          user: null,
-          isAuthenticated: false,
           isLoading: false,
           error: (result as Error).error.message,
         );
@@ -119,17 +156,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return result;
     } catch (e) {
-      state = state.copyWith(
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Failed to sign in: $e',
-      );
+      state = state.copyWith(isLoading: false, error: 'Failed to sign in: $e');
       return Result.error(AppError.unknown(message: 'Failed to sign in: $e'));
     }
   }
 
   /// Sign up with email, password, and name
+  /// PocketBase AuthStore automatically manages auth state
   Future<Result<User>> signUp(
     String email,
     String password,
@@ -141,16 +174,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.signUp(email, password, name);
 
       if (result.isSuccess) {
-        state = state.copyWith(
-          user: result.data,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        );
+        // AuthStore listener will automatically update state
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
-          user: null,
-          isAuthenticated: false,
           isLoading: false,
           error: (result as Error).error.message,
         );
@@ -158,17 +185,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return result;
     } catch (e) {
-      state = state.copyWith(
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Failed to sign up: $e',
-      );
+      state = state.copyWith(isLoading: false, error: 'Failed to sign up: $e');
       return Result.error(AppError.unknown(message: 'Failed to sign up: $e'));
     }
   }
 
   /// Sign out current user
+  /// PocketBase AuthStore automatically clears auth state
   Future<Result<void>> signOut() async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -176,12 +199,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.signOut();
 
       if (result.isSuccess) {
-        state = state.copyWith(
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        );
+        // AuthStore listener will automatically update state
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -197,6 +216,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Refresh authentication token
+  /// PocketBase AuthStore automatically manages updated auth state
   Future<Result<User>> refreshToken() async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -204,17 +224,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.refreshToken();
 
       if (result.isSuccess) {
-        state = state.copyWith(
-          user: result.data,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        );
+        // AuthStore listener will automatically update state
+        state = state.copyWith(isLoading: false, error: null);
       } else {
-        // Token refresh failed - user might need to re-authenticate
+        // Token refresh failed - AuthStore listener will clear state
         state = state.copyWith(
-          user: null,
-          isAuthenticated: false,
           isLoading: false,
           error: (result as Error).error.message,
         );
@@ -223,8 +237,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return result;
     } catch (e) {
       state = state.copyWith(
-        user: null,
-        isAuthenticated: false,
         isLoading: false,
         error: 'Failed to refresh token: $e',
       );
@@ -235,6 +247,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Update user profile
+  /// PocketBase AuthStore automatically manages updated user data
   Future<Result<User>> updateProfile(Map<String, dynamic> updates) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -242,11 +255,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.updateProfile(updates);
 
       if (result.isSuccess) {
-        state = state.copyWith(
-          user: result.data,
-          isLoading: false,
-          error: null,
-        );
+        // AuthStore listener will automatically update state with new user data
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -364,6 +374,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Delete current user account
+  /// PocketBase AuthStore automatically clears auth state
   Future<Result<void>> deleteAccount(String password) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -371,12 +382,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.deleteAccount(password);
 
       if (result.isSuccess) {
-        state = state.copyWith(
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        );
+        // AuthStore listener will automatically clear state
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -401,16 +408,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(error: null);
   }
 
-  /// Force refresh of current auth state
+  /// Force refresh of current auth state from PocketBase AuthStore
   void refreshAuthState() {
-    final user = _authService.currentUser;
-    final isAuthenticated = _authService.isAuthenticated;
-
-    state = state.copyWith(
-      user: user,
-      isAuthenticated: isAuthenticated,
-      error: null,
-    );
+    _updateStateFromAuthStore();
   }
 }
 

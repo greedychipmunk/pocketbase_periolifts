@@ -22,6 +22,10 @@ class AuthService {
   AuthService([PocketBase? pocketBaseClient])
     : _pb = pocketBaseClient ?? PocketBaseConfig.instance;
 
+  /// Get the underlying PocketBase client
+  /// Useful for accessing AuthStore and other PocketBase features
+  PocketBase get pocketBaseClient => _pb;
+
   /// Get currently authenticated user
   User? get currentUser => _currentUser;
 
@@ -65,7 +69,7 @@ class AuthService {
           .authWithPassword(email, password);
 
       // Convert PocketBase record to User model
-      _currentUser = User.fromJson(authResult.record.toJson());
+      _currentUser = User.fromRecord(authResult.record);
 
       return Result.success(_currentUser!);
     } on ClientException catch (e) {
@@ -150,7 +154,7 @@ class AuthService {
           .authWithPassword(email, password);
 
       // Convert PocketBase record to User model
-      _currentUser = User.fromJson(authResult.record.toJson());
+      _currentUser = User.fromRecord(authResult.record);
 
       // Send verification email
       await _sendVerificationEmail(email);
@@ -206,7 +210,7 @@ class AuthService {
       // Refresh authentication
       final authResult = await _pb.collection(_collection).authRefresh();
 
-      _currentUser = User.fromJson(authResult.record.toJson());
+      _currentUser = User.fromRecord(authResult.record);
       return Result.success(_currentUser!);
     } on ClientException catch (e) {
       return Result.error(ErrorHandler.handlePocketBaseError(e));
@@ -385,7 +389,7 @@ class AuthService {
           .update(_currentUser!.id, body: updates);
 
       // Update current user
-      _currentUser = User.fromJson(updatedRecord.toJson());
+      _currentUser = User.fromRecord(updatedRecord);
 
       return Result.success(_currentUser!);
     } on ClientException catch (e) {
