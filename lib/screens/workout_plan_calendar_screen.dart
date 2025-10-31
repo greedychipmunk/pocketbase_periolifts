@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../models/workout_plan.dart';
 import '../models/workout.dart';
+import '../providers/workout_plan_providers.dart';
 import '../services/workout_service.dart';
 import 'workout_screen.dart';
 
