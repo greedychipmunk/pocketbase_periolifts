@@ -244,6 +244,6 @@ class _WorkoutPlanCalendarScreenState extends State<WorkoutPlanCalendarScreen> {
 }
 
 // TODO: Before using this screen, ensure:
-// 1. The Appwrite 'workouts' collection has a 'description' attribute (String, required: false, default: '')
+// 1. The PocketBase 'workouts' collection has a 'description' attribute (String, required: false, default: '')
 // 2. Test the calendar with actual workout data
 // 3. Implement workout editing functionality when a workout is tapped

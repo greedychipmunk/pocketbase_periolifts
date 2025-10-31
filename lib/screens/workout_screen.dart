@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import '../models/workout.dart';
 import '../models/exercise.dart';
 import '../services/workout_service.dart';
-import 'package:appwrite/appwrite.dart';
-import 'package:intl/intl.dart';
+import '../services/exercise_service.dart';
 
 class WorkoutScreen extends StatefulWidget {
   final WorkoutService workoutService;
+  final ExerciseService exerciseService;
 
-  const WorkoutScreen({Key? key, required this.workoutService})
-    : super(key: key);
+  const WorkoutScreen({
+    Key? key,
+    required this.workoutService,
+    required this.exerciseService,
+  }) : super(key: key);
 
   @override
   State<WorkoutScreen> createState() => _WorkoutScreenState();
@@ -28,25 +31,28 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _loadWorkouts() async {
-    try {
-      final loadedWorkouts = await widget.workoutService.getWorkouts();
+    final result = await widget.workoutService.getWorkouts();
+    if (result.isSuccess) {
       setState(() {
-        workouts = loadedWorkouts;
+        workouts = result.data!;
         isLoading = false;
       });
-    } catch (e) {
-      _showError('Failed to load workouts');
+    } else {
+      _showError('Failed to load workouts: ${result.error!.message}');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   Future<void> _loadExercises() async {
-    try {
-      final loadedExercises = await widget.workoutService.getExercises();
+    final result = await widget.exerciseService.getExercises();
+    if (result.isSuccess) {
       setState(() {
-        exercises = loadedExercises;
+        exercises = result.data!;
       });
-    } catch (e) {
-      _showError('Failed to load exercises');
+    } else {
+      _showError('Failed to load exercises: ${result.error!.message}');
     }
   }
 
@@ -60,21 +66,25 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final name = await _showWorkoutNameDialog();
     if (name == null) return;
 
+    final now = DateTime.now();
     final workout = Workout(
-      id: '', // Will be set by Appwrite
-      userId: '', // Will be set by WorkoutService
+      id: '',
+      created: now,
+      updated: now,
       name: name,
-      scheduledDate: DateTime.now(),
+      description: null,
+      estimatedDuration: 60, // Default 60 minutes
       exercises: [],
+      userId: '', // Will be set by WorkoutService
     );
 
-    try {
-      final createdWorkout = await widget.workoutService.createWorkout(workout);
+    final result = await widget.workoutService.createWorkout(workout);
+    if (result.isSuccess) {
       setState(() {
-        workouts.add(createdWorkout);
+        workouts.add(result.data!);
       });
-    } catch (e) {
-      _showError('Failed to create workout');
+    } else {
+      _showError('Failed to create workout: ${result.error!.message}');
     }
   }
 
@@ -122,10 +132,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           return ListTile(
             title: Text(workout.name),
             subtitle: Text(
-              DateFormat('EEEE, MMMM d, y').format(workout.scheduledDate),
+              'Exercises: ${workout.exercises.length} • ${workout.estimatedDuration} min',
             ),
-            trailing: workout.isCompleted
-                ? const Icon(Icons.check_circle, color: Colors.green)
+            trailing: workout.description?.isNotEmpty == true
+                ? const Icon(Icons.notes, color: Colors.grey)
                 : null,
             onTap: () => _navigateToWorkoutDetail(workout),
           );

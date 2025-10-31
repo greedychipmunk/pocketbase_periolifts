@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:appwrite/appwrite.dart';
 
 // Import all the new workout history components
 import '../models/workout_history.dart';
@@ -27,10 +26,7 @@ class WorkoutHistoryIntegrationExample extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'Workout History Integration',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       home: const IntegrationSetupScreen(),
     );
   }
@@ -45,7 +41,6 @@ class IntegrationSetupScreen extends StatefulWidget {
 }
 
 class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
-  late Client client;
   late WorkoutService workoutService;
   late WorkoutSessionService workoutSessionService;
   late WorkoutHistoryService workoutHistoryService;
@@ -58,29 +53,13 @@ class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
   }
 
   void _initializeServices() {
-    // 1. Initialize Appwrite client
-    client = Client()
-      ..setEndpoint('YOUR_APPWRITE_ENDPOINT')
-      ..setProject('YOUR_PROJECT_ID')
-      ..setSelfSigned(status: true); // Only for development
+    // 1. Initialize PocketBase services
+    workoutService = WorkoutService();
+    workoutSessionService = WorkoutSessionService();
+    authService = AuthService();
 
-    // 2. Initialize existing services
-    final databases = Databases(client);
-    final account = Account(client);
-    
-    workoutService = WorkoutService(databases: databases, client: client);
-    workoutSessionService = WorkoutSessionService(databases: databases, client: client);
-    authService = AuthService(account: account);
-
-    // 3. Initialize the new workout history service
-    workoutHistoryService = WorkoutHistoryService(
-      databases: databases, 
-      client: client,
-      // These collection IDs should match your Appwrite database structure
-      databaseId: '685884d800152b208c1a',
-      workoutHistoryCollectionId: 'workout-history',
-      workoutStatsCollectionId: 'workout-stats',
-    );
+    // 2. Initialize the workout history service
+    workoutHistoryService = WorkoutHistoryService();
   }
 
   @override
@@ -92,9 +71,7 @@ class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
         // You would also override other service providers as needed
       ],
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Workout History Integration'),
-        ),
+        appBar: AppBar(title: const Text('Workout History Integration')),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -115,7 +92,7 @@ class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        '1. Initialize Appwrite Client and Services\n'
+                        '1. Initialize PocketBase Services\n'
                         '2. Create WorkoutHistoryService instance\n'
                         '3. Override Riverpod providers\n'
                         '4. Use enhanced screens and widgets\n'
@@ -130,9 +107,9 @@ class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
               // Available Components
               Text(
                 'Available Components',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
 
@@ -220,11 +197,9 @@ class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
   }
 
   void _navigateToWorkoutStats(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const WorkoutStatsScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const WorkoutStatsScreen()));
   }
 
   void _showIntegrationDialog(BuildContext context) {
@@ -242,7 +217,9 @@ class _IntegrationSetupScreenState extends State<IntegrationSetupScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 12),
-              Text('1. User completes workout in WorkoutTrackingScreenRiverpod'),
+              Text(
+                '1. User completes workout in WorkoutTrackingScreenRiverpod',
+              ),
               SizedBox(height: 8),
               Text('2. Enhanced tracking provider auto-saves progress'),
               SizedBox(height: 8),
@@ -289,10 +266,7 @@ class IntegratedAppExample extends ConsumerWidget {
     // This would be your main app structure
     return MaterialApp(
       title: 'Periolifts with Workout History',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       // Your existing app routing and structure would go here
       home: const IntegratedHomeScreen(),
     );
@@ -346,21 +320,21 @@ class IntegratedHomeScreen extends StatelessWidget {
   }
 }
 
-// Mock services for example purposes
+/// Mock services for example/testing purposes
 class _MockWorkoutService extends WorkoutService {
-  _MockWorkoutService() : super(databases: Databases(Client()), client: Client());
+  _MockWorkoutService() : super();
 }
 
 class _MockWorkoutSessionService extends WorkoutSessionService {
-  _MockWorkoutSessionService() : super(databases: Databases(Client()), client: Client());
+  _MockWorkoutSessionService() : super();
 }
 
 class _MockWorkoutHistoryService extends WorkoutHistoryService {
-  _MockWorkoutHistoryService() : super(databases: Databases(Client()), client: Client());
+  _MockWorkoutHistoryService() : super();
 }
 
 class _MockAuthService extends AuthService {
-  _MockAuthService() : super(account: Account(Client()));
+  _MockAuthService() : super();
 }
 
 /// Usage example showing how to use the workout history components
