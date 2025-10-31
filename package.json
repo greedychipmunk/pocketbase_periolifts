@@ -1,0 +1,32 @@
+{
+  "name": "pocketbase-periolifts",
+  "version": "1.0.0",
+  "description": "Script management for PerioLifts Flutter development",
+  "private": true,
+  "scripts": {
+    "pocketbase:setup": "./scripts/setup-pocketbase.sh",
+    "pocketbase:start": "./scripts/setup-pocketbase.sh start",
+    "pocketbase:clean": "./scripts/setup-pocketbase.sh clean",
+    "pocketbase:help": "./scripts/setup-pocketbase.sh help",
+    "flutter:get": "flutter pub get",
+    "flutter:run": "flutter run",
+    "flutter:build": "flutter build",
+    "flutter:test": "flutter test",
+    "flutter:analyze": "flutter analyze",
+    "flutter:format": "dart format .",
+    "dev:setup": "npm run pocketbase:setup && npm run flutter:get",
+    "dev:start": "npm run pocketbase:start"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "flutter",
+    "pocketbase",
+    "fitness",
+    "periolifts",
+    "development"
+  ],
+  "author": "PerioLifts Team",
+  "license": "MIT"
+}
