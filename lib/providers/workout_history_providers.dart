@@ -4,7 +4,7 @@ import '../services/workout_history_service.dart';
 
 // Service provider
 final workoutHistoryServiceProvider = Provider<WorkoutHistoryService>((ref) {
-  throw UnimplementedError('WorkoutHistoryService provider must be overridden');
+  return WorkoutHistoryService();
 });
 
 // Workout history provider with filtering and pagination
