@@ -1,387 +1,615 @@
-import 'dart:typed_data';
-import 'dart:convert';
-import 'package:appwrite/appwrite.dart';
-import 'package:collection/collection.dart';
+import 'package:pocketbase/pocketbase.dart';
 import '../models/workout_history.dart';
+import '../utils/result.dart';
+import '../utils/error_handler.dart';
+import 'base_pocketbase_service.dart';
 
-class WorkoutHistoryService {
-  final Databases databases;
-  final Account account;
-  final String databaseId;
-  final String workoutHistoryCollectionId;
-  final String workoutStatsCollectionId;
+/// Service for managing workout history and session data using PocketBase
+///
+/// Handles workout session management, progress tracking, and performance analytics.
+/// All operations require user authentication and follow constitutional performance
+/// requirements (<500ms operations).
+class WorkoutHistoryService extends BasePocketBaseService {
+  static const String _collectionName = 'workout_history';
 
-  WorkoutHistoryService({
-    required this.databases,
-    required Client client,
-    this.databaseId = '685884d800152b208c1a',
-    this.workoutHistoryCollectionId = 'workout-history', // New collection
-    this.workoutStatsCollectionId = 'workout-stats', // New collection
-  }) : account = Account(client);
+  WorkoutHistoryService() : super();
 
-  /// GET /workout-history/documents - Get user's workout history with filtering and pagination
-  Future<List<WorkoutHistoryEntry>> getWorkoutHistory({
+  /// Get user's workout history with filtering and pagination
+  ///
+  /// Supports filtering by date range, status, exercise name, and workout name.
+  /// Returns paginated results with constitutional performance requirements.
+  ///
+  /// Parameters:
+  /// - [page]: Page number (must be > 0)
+  /// - [perPage]: Items per page (1-100)
+  /// - [startDate]: Filter entries after this date
+  /// - [endDate]: Filter entries before this date
+  /// - [status]: Filter by workout status
+  /// - [exerciseName]: Filter by exercise name (partial match)
+  /// - [workoutName]: Filter by workout name (partial match)
+  Future<Result<List<WorkoutHistoryEntry>>> getWorkoutHistory({
+    int page = 1,
+    int perPage = 20,
     DateTime? startDate,
     DateTime? endDate,
     WorkoutHistoryStatus? status,
     String? exerciseName,
     String? workoutName,
-    int limit = 20,
-    int offset = 0,
   }) async {
     try {
-      final currentUser = await account.get();
-      List<String> queries = [];
-      
-      // Filter by current user
-      queries.add(Query.equal('userId', currentUser.$id));
-      
+      // Validate pagination parameters
+      if (page < 1) {
+        return Result.error(
+          AppError.validation(message: 'Page number must be greater than 0'),
+        );
+      }
+      if (perPage < 1 || perPage > 100) {
+        return Result.error(
+          AppError.validation(
+            message: 'Items per page must be between 1 and 100',
+          ),
+        );
+      }
+
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to access workout history',
+          ),
+        );
+      }
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
+      }
+
+      // Build filter query
+      final filters = <String>['user_id = "$userId"'];
+
       // Date range filtering
       if (startDate != null) {
-        queries.add(Query.greaterThanEqual('completedAt', startDate.toIso8601String()));
+        filters.add('started_at >= "${startDate.toIso8601String()}"');
       }
       if (endDate != null) {
-        queries.add(Query.lessThanEqual('completedAt', endDate.toIso8601String()));
+        filters.add('completed_at <= "${endDate.toIso8601String()}"');
       }
-      
+
       // Status filtering
       if (status != null) {
-        queries.add(Query.equal('status', status.name));
+        filters.add('status = "${status.name}"');
       }
-      
-      // Workout name search
-      if (workoutName != null && workoutName.isNotEmpty) {
-        queries.add(Query.search('name', workoutName));
+
+      // Exercise name filtering (partial match)
+      if (exerciseName != null && exerciseName.trim().isNotEmpty) {
+        final sanitizedExerciseName = _sanitizeSearchQuery(exerciseName);
+        filters.add('exercises ~ "$sanitizedExerciseName"');
       }
-      
-      // Pagination
-      queries.add(Query.limit(limit));
-      queries.add(Query.offset(offset));
-      
-      // Order by completion date descending (most recent first)
-      queries.add(Query.orderDesc('completedAt'));
 
-      final response = await databases.listDocuments(
-        databaseId: databaseId,
-        collectionId: workoutHistoryCollectionId,
-        queries: queries,
-      );
+      // Workout name filtering (partial match)
+      if (workoutName != null && workoutName.trim().isNotEmpty) {
+        final sanitizedWorkoutName = _sanitizeSearchQuery(workoutName);
+        filters.add('name ~ "$sanitizedWorkoutName"');
+      }
 
-      List<WorkoutHistoryEntry> entries = response.documents
-          .map((doc) => WorkoutHistoryEntry.fromJson(doc.data))
+      final filter = filters.join(' && ');
+
+      final records = await pb
+          .collection(_collectionName)
+          .getList(
+            page: page,
+            perPage: perPage,
+            filter: filter,
+            sort: '-completed_at,-started_at,-created',
+          );
+
+      final entries = records.items
+          .map((record) => WorkoutHistoryEntry.fromJson(record.toJson()))
           .toList();
-          
-      // Client-side exercise filtering if needed
-      if (exerciseName != null && exerciseName.isNotEmpty) {
-        entries = entries.where((entry) {
-          return entry.exercises.any((exercise) =>
-              exercise.exerciseName.toLowerCase().contains(exerciseName.toLowerCase()));
-        }).toList();
-      }
 
-      return entries;
-    } on AppwriteException catch (e) {
-      if (e.code == 401 || (e.message?.contains('user_unauthorized') ?? false)) {
-        return [];
-      }
-      print('Error fetching workout history: $e');
-      rethrow;
+      return Result.success(entries);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
     } catch (e) {
-      if (e.toString().contains('user_unauthorized') || e.toString().contains('401')) {
-        return [];
-      }
-      print('Error fetching workout history: $e');
-      rethrow;
+      return Result.error(
+        AppError.unknown(message: 'Failed to fetch workout history: $e'),
+      );
     }
   }
 
-  /// POST /workout-history/documents - Create new workout history entry
-  Future<WorkoutHistoryEntry> createWorkoutHistory(WorkoutHistoryEntry entry) async {
+  /// Get a specific workout history entry by ID
+  ///
+  /// Returns the workout history entry if found and user has access.
+  /// Enforces ownership validation for security.
+  Future<Result<WorkoutHistoryEntry>> getWorkoutHistoryById(
+    String historyId,
+  ) async {
     try {
-      final currentUser = await account.get();
-      final entryWithUser = entry.copyWith(
-        userId: currentUser.$id,
-      );
-      
-      final data = entryWithUser.toJson();
-      
-      final document = await databases.createDocument(
-        databaseId: databaseId,
-        collectionId: workoutHistoryCollectionId,
-        documentId: ID.unique(),
-        data: data,
-      );
-
-      return WorkoutHistoryEntry.fromJson(document.data);
-    } catch (e) {
-      print('Error creating workout history: $e');
-      rethrow;
-    }
-  }
-
-  /// PUT /workout-history/documents/{historyId} - Update workout history
-  Future<WorkoutHistoryEntry> updateWorkoutHistory(WorkoutHistoryEntry entry) async {
-    try {
-      final data = entry.toJson();
-      
-      final document = await databases.updateDocument(
-        databaseId: databaseId,
-        collectionId: workoutHistoryCollectionId,
-        documentId: entry.id,
-        data: data,
-      );
-
-      return WorkoutHistoryEntry.fromJson(document.data);
-    } catch (e) {
-      print('Error updating workout history: $e');
-      rethrow;
-    }
-  }
-
-  /// GET /workout-history/documents/{historyId} - Get specific workout history entry
-  Future<WorkoutHistoryEntry?> getWorkoutHistoryEntry(String historyId) async {
-    try {
-      final document = await databases.getDocument(
-        databaseId: databaseId,
-        collectionId: workoutHistoryCollectionId,
-        documentId: historyId,
-      );
-      
-      return WorkoutHistoryEntry.fromJson(document.data);
-    } catch (e) {
-      print('Error fetching workout history entry: $e');
-      return null;
-    }
-  }
-
-  /// GET /workout-stats/documents - Get workout statistics for date range
-  Future<WorkoutHistoryStats> getWorkoutStats({
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    try {
-      final currentUser = await account.get();
-      
-      // Set default date range if not provided
-      final now = DateTime.now();
-      final effectiveStartDate = startDate ?? DateTime(now.year, now.month, 1);
-      final effectiveEndDate = endDate ?? now;
-      
-      // Get workout history for the date range
-      final workouts = await getWorkoutHistory(
-        startDate: effectiveStartDate,
-        endDate: effectiveEndDate,
-        limit: 1000, // Get all workouts in range for accurate stats
-      );
-      
-      // Calculate statistics from workout history
-      return _calculateStatsFromWorkouts(
-        currentUser.$id,
-        workouts,
-        effectiveStartDate,
-        effectiveEndDate,
-      );
-    } catch (e) {
-      print('Error fetching workout stats: $e');
-      rethrow;
-    }
-  }
-
-  /// Calculate comprehensive statistics from workout history
-  WorkoutHistoryStats _calculateStatsFromWorkouts(
-    String userId,
-    List<WorkoutHistoryEntry> workouts,
-    DateTime startDate,
-    DateTime endDate,
-  ) {
-    final completedWorkouts = workouts.where((w) => w.isCompleted).toList();
-    
-    // Calculate basic metrics
-    final totalWorkouts = workouts.length;
-    final completedCount = completedWorkouts.length;
-    
-    // Calculate total duration
-    Duration totalDuration = Duration.zero;
-    for (final workout in completedWorkouts) {
-      if (workout.duration != null) {
-        totalDuration += workout.duration!;
+      // Validate input
+      if (historyId.trim().isEmpty) {
+        return Result.error(
+          AppError.validation(message: 'History ID cannot be empty'),
+        );
       }
-    }
-    
-    // Calculate total weight lifted
-    double totalWeightLifted = 0.0;
-    for (final workout in completedWorkouts) {
-      totalWeightLifted += workout.totalWeightLifted;
-    }
-    
-    // Calculate exercise frequency
-    Map<String, int> exerciseFrequency = {};
-    List<ExerciseProgressData> exerciseProgress = [];
-    Map<String, List<WorkoutHistoryExercise>> exerciseMap = {};
-    
-    // Group exercises by name for analysis
-    for (final workout in completedWorkouts) {
-      for (final exercise in workout.exercises) {
-        exerciseFrequency[exercise.exerciseName] = 
-            (exerciseFrequency[exercise.exerciseName] ?? 0) + 1;
-            
-        if (!exerciseMap.containsKey(exercise.exerciseName)) {
-          exerciseMap[exercise.exerciseName] = [];
-        }
-        exerciseMap[exercise.exerciseName]!.add(exercise);
+
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to access workout history',
+          ),
+        );
       }
-    }
-    
-    // Calculate exercise progress data
-    exerciseMap.forEach((exerciseName, exercises) {
-      if (exercises.isNotEmpty) {
-        final exerciseId = exercises.first.exerciseId;
-        
-        // Calculate max weight across all exercises
-        double maxWeight = 0.0;
-        double totalWeight = 0.0;
-        int totalReps = 0;
-        double totalVolume = 0.0;
-        int completedSetsCount = 0;
-        
-        for (final exercise in exercises) {
-          for (final set in exercise.sets) {
-            if (set.completed) {
-              maxWeight = set.weight > maxWeight ? set.weight : maxWeight;
-              totalWeight += set.weight;
-              totalReps += set.reps;
-              totalVolume += set.volume;
-              completedSetsCount++;
-            }
-          }
-        }
-        
-        final avgWeight = completedSetsCount > 0 ? totalWeight / completedSetsCount : 0.0;
-        
-        exerciseProgress.add(ExerciseProgressData(
-          exerciseId: exerciseId,
-          exerciseName: exerciseName,
-          maxWeight: maxWeight,
-          avgWeight: avgWeight,
-          totalReps: totalReps,
-          totalVolume: totalVolume,
-        ));
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
       }
-    });
-    
-    // Sort exercise progress by total volume descending
-    exerciseProgress.sort((a, b) => b.totalVolume.compareTo(a.totalVolume));
-    
-    return WorkoutHistoryStats(
-      userId: userId,
-      periodStart: startDate,
-      periodEnd: endDate,
-      totalWorkouts: totalWorkouts,
-      completedWorkouts: completedCount,
-      totalDuration: totalDuration,
-      totalWeightLifted: totalWeightLifted,
-      exerciseFrequency: exerciseFrequency,
-      exerciseProgress: exerciseProgress,
-    );
+
+      final record = await pb.collection(_collectionName).getOne(historyId);
+
+      // Verify ownership after retrieving
+      if (record.data['user_id'] != userId) {
+        return Result.error(
+          AppError.permission(
+            message: 'You can only access your own workout history',
+          ),
+        );
+      }
+
+      final entry = WorkoutHistoryEntry.fromJson(record.toJson());
+      return Result.success(entry);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    } catch (e) {
+      return Result.error(
+        AppError.unknown(message: 'Failed to fetch workout history entry: $e'),
+      );
+    }
+  }
+
+  /// Create a new workout history entry
+  ///
+  /// Validates the entry data and creates a new workout session record.
+  /// Automatically sets the user ID and creation timestamp.
+  Future<Result<WorkoutHistoryEntry>> createWorkoutHistory(
+    WorkoutHistoryEntry entry,
+  ) async {
+    try {
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to create workout history',
+          ),
+        );
+      }
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
+      }
+
+      // Validate entry data
+      final validationResult = _validateWorkoutHistoryEntry(entry);
+      if (validationResult.isError) {
+        return Result.error(validationResult.error!);
+      }
+
+      // Prepare data for creation
+      final entryData = entry.toJson();
+      entryData['user_id'] = userId; // Ensure correct user association
+      entryData.remove('id'); // Remove ID for creation
+
+      final record = await pb
+          .collection(_collectionName)
+          .create(body: entryData);
+
+      final createdEntry = WorkoutHistoryEntry.fromJson(record.toJson());
+      return Result.success(createdEntry);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    } catch (e) {
+      return Result.error(
+        AppError.unknown(message: 'Failed to create workout history: $e'),
+      );
+    }
+  }
+
+  /// Update an existing workout history entry
+  ///
+  /// Validates ownership and updates the workout session data.
+  /// Only the owner can update their workout history entries.
+  Future<Result<WorkoutHistoryEntry>> updateWorkoutHistory(
+    String historyId,
+    WorkoutHistoryEntry entry,
+  ) async {
+    try {
+      // Validate input
+      if (historyId.trim().isEmpty) {
+        return Result.error(
+          AppError.validation(message: 'History ID cannot be empty'),
+        );
+      }
+
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to update workout history',
+          ),
+        );
+      }
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
+      }
+
+      // Validate entry data
+      final validationResult = _validateWorkoutHistoryEntry(entry);
+      if (validationResult.isError) {
+        return Result.error(validationResult.error!);
+      }
+
+      // Verify ownership before update
+      final existingRecord = await pb
+          .collection(_collectionName)
+          .getOne(historyId);
+
+      if (existingRecord.data['user_id'] != userId) {
+        return Result.error(
+          AppError.permission(
+            message: 'You can only update your own workout history',
+          ),
+        );
+      }
+
+      // Prepare data for update
+      final entryData = entry.toJson();
+      entryData['user_id'] = userId; // Ensure user ID remains correct
+      entryData.remove('id'); // Remove ID for update
+
+      final record = await pb
+          .collection(_collectionName)
+          .update(historyId, body: entryData);
+
+      final updatedEntry = WorkoutHistoryEntry.fromJson(record.toJson());
+      return Result.success(updatedEntry);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    } catch (e) {
+      return Result.error(
+        AppError.unknown(message: 'Failed to update workout history: $e'),
+      );
+    }
   }
 
   /// Delete a workout history entry
-  Future<void> deleteWorkoutHistory(String historyId) async {
+  ///
+  /// Permanently removes the workout session data.
+  /// Only the owner can delete their workout history entries.
+  Future<Result<void>> deleteWorkoutHistory(String historyId) async {
     try {
-      await databases.deleteDocument(
-        databaseId: databaseId,
-        collectionId: workoutHistoryCollectionId,
-        documentId: historyId,
-      );
+      // Validate input
+      if (historyId.trim().isEmpty) {
+        return Result.error(
+          AppError.validation(message: 'History ID cannot be empty'),
+        );
+      }
+
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to delete workout history',
+          ),
+        );
+      }
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
+      }
+
+      // Verify ownership before deletion
+      final existingRecord = await pb
+          .collection(_collectionName)
+          .getOne(historyId);
+
+      if (existingRecord.data['user_id'] != userId) {
+        return Result.error(
+          AppError.permission(
+            message: 'You can only delete your own workout history',
+          ),
+        );
+      }
+
+      await pb.collection(_collectionName).delete(historyId);
+
+      return Result.success(null);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
     } catch (e) {
-      print('Error deleting workout history: $e');
-      rethrow;
+      return Result.error(
+        AppError.unknown(message: 'Failed to delete workout history: $e'),
+      );
     }
   }
 
-  /// Get recent workout history (last 10 workouts)
-  Future<List<WorkoutHistoryEntry>> getRecentWorkoutHistory() async {
-    return getWorkoutHistory(
-      status: WorkoutHistoryStatus.completed,
-      limit: 10,
-      offset: 0,
-    );
-  }
-
-  /// Get workout streaks and patterns
-  Future<Map<String, dynamic>> getWorkoutPatterns({
+  /// Get user's workout statistics
+  ///
+  /// Returns aggregated statistics including completion rates, total workouts,
+  /// and exercise progress data for analytics dashboard.
+  Future<Result<WorkoutHistoryStats>> getUserWorkoutStats({
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    final workouts = await getWorkoutHistory(
-      startDate: startDate,
-      endDate: endDate,
-      status: WorkoutHistoryStatus.completed,
-      limit: 365, // Get up to a year of data
-    );
-    
-    // Calculate current streak
-    int currentStreak = 0;
-    int longestStreak = 0;
-    int tempStreak = 0;
-    
+    try {
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to access workout statistics',
+          ),
+        );
+      }
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
+      }
+
+      // Build filter for statistics
+      final filters = <String>['user_id = "$userId"'];
+
+      // Date range filtering
+      if (startDate != null) {
+        filters.add('completed_at >= "${startDate.toIso8601String()}"');
+      }
+      if (endDate != null) {
+        filters.add('completed_at <= "${endDate.toIso8601String()}"');
+      }
+
+      final filter = filters.join(' && ');
+
+      // Get all workout history entries for statistics
+      final records = await pb
+          .collection(_collectionName)
+          .getFullList(filter: filter, sort: '-completed_at');
+
+      final entries = records
+          .map((record) => WorkoutHistoryEntry.fromJson(record.toJson()))
+          .toList();
+
+      // Calculate statistics
+      final stats = _calculateWorkoutStats(entries);
+      return Result.success(stats);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    } catch (e) {
+      return Result.error(
+        AppError.unknown(message: 'Failed to fetch workout statistics: $e'),
+      );
+    }
+  }
+
+  /// Get recent workout activities for dashboard
+  ///
+  /// Returns the most recent workout sessions for quick overview.
+  /// Limited to recent activities for performance.
+  Future<Result<List<WorkoutHistoryEntry>>> getRecentWorkouts({
+    int limit = 10,
+  }) async {
+    try {
+      // Validate input
+      if (limit < 1 || limit > 50) {
+        return Result.error(
+          AppError.validation(message: 'Limit must be between 1 and 50'),
+        );
+      }
+
+      // Check authentication
+      if (!pb.authStore.isValid) {
+        return Result.error(
+          AppError.authentication(
+            message: 'Authentication required to access recent workouts',
+          ),
+        );
+      }
+
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        return Result.error(
+          AppError.authentication(message: 'User ID not available'),
+        );
+      }
+
+      final records = await pb
+          .collection(_collectionName)
+          .getList(
+            page: 1,
+            perPage: limit,
+            filter: 'user_id = "$userId"',
+            sort: '-completed_at,-started_at,-created',
+          );
+
+      final entries = records.items
+          .map((record) => WorkoutHistoryEntry.fromJson(record.toJson()))
+          .toList();
+
+      return Result.success(entries);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    } catch (e) {
+      return Result.error(
+        AppError.unknown(message: 'Failed to fetch recent workouts: $e'),
+      );
+    }
+  }
+
+  /// Private method to validate workout history entry data
+  Result<void> _validateWorkoutHistoryEntry(WorkoutHistoryEntry entry) {
+    // Validate workout name
+    if (entry.name.trim().isEmpty) {
+      return Result.error(
+        AppError.validation(message: 'Workout name cannot be empty'),
+      );
+    }
+    if (entry.name.length > 100) {
+      return Result.error(
+        AppError.validation(
+          message: 'Workout name cannot exceed 100 characters',
+        ),
+      );
+    }
+
+    // Validate notes length
+    if (entry.notes.length > 1000) {
+      return Result.error(
+        AppError.validation(message: 'Notes cannot exceed 1000 characters'),
+      );
+    }
+
+    // Validate exercise data
+    if (entry.exercises.isNotEmpty) {
+      for (final exercise in entry.exercises) {
+        final exerciseValidation = _validateWorkoutHistoryExercise(exercise);
+        if (exerciseValidation.isError) {
+          return exerciseValidation;
+        }
+      }
+    }
+
+    // Validate date logic
+    if (entry.startedAt != null && entry.completedAt != null) {
+      if (entry.completedAt!.isBefore(entry.startedAt!)) {
+        return Result.error(
+          AppError.validation(
+            message: 'Completion time cannot be before start time',
+          ),
+        );
+      }
+    }
+
+    // Validate scheduled date is not too far in the past
+    if (entry.scheduledDate != null) {
+      final oneYearAgo = DateTime.now().subtract(const Duration(days: 365));
+      if (entry.scheduledDate!.isBefore(oneYearAgo)) {
+        return Result.error(
+          AppError.validation(
+            message: 'Scheduled date cannot be more than one year in the past',
+          ),
+        );
+      }
+    }
+
+    return Result.success(null);
+  }
+
+  /// Private method to validate workout history exercise data
+  Result<void> _validateWorkoutHistoryExercise(
+    WorkoutHistoryExercise exercise,
+  ) {
+    // Validate exercise ID
+    if (exercise.exerciseId.trim().isEmpty) {
+      return Result.error(
+        AppError.validation(message: 'Exercise ID cannot be empty'),
+      );
+    }
+
+    // Validate exercise name
+    if (exercise.exerciseName.trim().isEmpty) {
+      return Result.error(
+        AppError.validation(message: 'Exercise name cannot be empty'),
+      );
+    }
+
+    // Validate sets data
+    for (final set in exercise.sets) {
+      if (set.reps < 0 || set.reps > 1000) {
+        return Result.error(
+          AppError.validation(message: 'Set reps must be between 0 and 1000'),
+        );
+      }
+      if (set.weight < 0) {
+        return Result.error(
+          AppError.validation(message: 'Set weight cannot be negative'),
+        );
+      }
+    }
+
+    return Result.success(null);
+  }
+
+  /// Private method to sanitize search queries for PocketBase
+  String _sanitizeSearchQuery(String query) {
+    return query
+        .replaceAll('"', '\\"')
+        .replaceAll('\\', '\\\\')
+        .replaceAll('\n', ' ')
+        .replaceAll('\r', ' ')
+        .trim();
+  }
+
+  /// Private method to calculate workout statistics from entries
+  WorkoutHistoryStats _calculateWorkoutStats(
+    List<WorkoutHistoryEntry> entries,
+  ) {
+    final userId = pb.authStore.model?.id?.toString() ?? '';
     final now = DateTime.now();
-    final sortedWorkouts = workouts
-        .where((w) => w.completedAt != null)
-        .toList()
-      ..sort((a, b) => b.completedAt!.compareTo(a.completedAt!));
-    
-    // Calculate streaks based on consecutive days with workouts
-    Set<String> workoutDates = {};
-    for (final workout in sortedWorkouts) {
-      if (workout.completedAt != null) {
-        final dateKey = _formatDateKey(workout.completedAt!);
-        workoutDates.add(dateKey);
-      }
-    }
-    
-    // Check for current streak
-    DateTime checkDate = now;
-    while (workoutDates.contains(_formatDateKey(checkDate))) {
-      currentStreak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
-    }
-    
-    // Calculate longest streak
-    final sortedDates = workoutDates.toList()..sort();
-    for (int i = 0; i < sortedDates.length; i++) {
-      if (i == 0 || _isConsecutiveDay(sortedDates[i-1], sortedDates[i])) {
-        tempStreak++;
-        longestStreak = tempStreak > longestStreak ? tempStreak : longestStreak;
-      } else {
-        tempStreak = 1;
-      }
-    }
-    
-    // Calculate weekly patterns
-    Map<int, int> weeklyPattern = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
-    for (final workout in sortedWorkouts) {
-      if (workout.completedAt != null) {
-        final weekday = workout.completedAt!.weekday;
-        weeklyPattern[weekday] = (weeklyPattern[weekday] ?? 0) + 1;
-      }
-    }
-    
-    return {
-      'currentStreak': currentStreak,
-      'longestStreak': longestStreak,
-      'weeklyPattern': weeklyPattern,
-      'totalWorkoutDays': workoutDates.length,
-    };
-  }
+    final startOfMonth = DateTime(now.year, now.month, 1);
 
-  String _formatDateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
+    final totalWorkouts = entries.length;
+    final completedWorkouts = entries
+        .where((e) => e.status == WorkoutHistoryStatus.completed)
+        .length;
 
-  bool _isConsecutiveDay(String date1, String date2) {
-    final d1 = DateTime.parse(date1);
-    final d2 = DateTime.parse(date2);
-    return d2.difference(d1).inDays == 1;
+    final totalDuration = entries
+        .where((e) => e.duration != null)
+        .fold<Duration>(Duration.zero, (sum, e) => sum + e.duration!);
+
+    final totalVolume = entries
+        .where((e) => e.status == WorkoutHistoryStatus.completed)
+        .fold<double>(0, (sum, e) => sum + e.totalWeightLifted);
+
+    // Calculate exercise frequency (simplified)
+    final exerciseFrequency = <String, int>{};
+    final exerciseProgress = <ExerciseProgressData>[];
+
+    for (final entry in entries) {
+      if (entry.status == WorkoutHistoryStatus.completed) {
+        for (final exercise in entry.exercises) {
+          exerciseFrequency[exercise.exerciseName] =
+              (exerciseFrequency[exercise.exerciseName] ?? 0) + 1;
+        }
+      }
+    }
+
+    return WorkoutHistoryStats(
+      userId: userId,
+      periodStart: startOfMonth,
+      periodEnd: now,
+      totalWorkouts: totalWorkouts,
+      completedWorkouts: completedWorkouts,
+      totalDuration: totalDuration,
+      totalWeightLifted: totalVolume,
+      exerciseFrequency: exerciseFrequency,
+      exerciseProgress:
+          exerciseProgress, // Could be calculated more extensively
+    );
   }
 }

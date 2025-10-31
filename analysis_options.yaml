@@ -9,6 +9,17 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# Constitutional Code Quality Requirements - Enhanced Static Analysis
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+  
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
@@ -21,8 +32,33 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # Code Quality Rules (Constitutional Requirements)
+    prefer_single_quotes: true
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    prefer_final_locals: true
+    prefer_final_in_for_each: true
+    avoid_function_literals_in_foreach_calls: true
+    
+    # Performance Rules
+    avoid_slow_async_io: true
+    close_sinks: true
+    
+    # Error Prevention Rules
+    avoid_catching_errors: true
+    avoid_empty_else: true
+    avoid_type_to_string: true
+    cancel_subscriptions: true
+    literal_only_boolean_expressions: true
+    test_types_in_equals: true
+    throw_in_finally: true
+    unnecessary_statements: true
+    
+    # Documentation Rules
+    public_member_api_docs: false  # Enable when ready for production
+    
+    # Disable some overly strict rules
+    avoid_print: false  # Allow prints for debugging during development
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

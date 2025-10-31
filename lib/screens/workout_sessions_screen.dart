@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:appwrite/appwrite.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/workout_session.dart';
 import '../providers/workout_session_providers.dart';
 import '../widgets/workout_session_card.dart';
@@ -17,7 +15,8 @@ class WorkoutSessionsScreen extends ConsumerStatefulWidget {
   const WorkoutSessionsScreen({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<WorkoutSessionsScreen> createState() => _WorkoutSessionsScreenState();
+  ConsumerState<WorkoutSessionsScreen> createState() =>
+      _WorkoutSessionsScreenState();
 }
 
 class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
@@ -36,23 +35,10 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
 
   /// Helper method to create service instances with proper configuration
   Map<String, dynamic> _createServices() {
-    final client = Client();
-    client
-        .setEndpoint(dotenv.env['APPWRITE_PUBLIC_ENDPOINT']!)
-        .setProject(dotenv.env['APPWRITE_PROJECT_ID']!)
-        .setSelfSigned(status: true);
+    final workoutService = WorkoutService();
+    final authService = AuthService();
 
-    final databases = Databases(client);
-    final workoutService = WorkoutService(
-      databases: databases,
-      client: client,
-    );
-    final authService = AuthService(client: client);
-
-    return {
-      'workoutService': workoutService,
-      'authService': authService,
-    };
+    return {'workoutService': workoutService, 'authService': authService};
   }
 
   @override
@@ -63,7 +49,8 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.8) {
       final filter = _getCurrentFilter();
       final notifier = ref.read(workoutSessionsProvider(filter).notifier);
       notifier.loadMore();
@@ -146,7 +133,8 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
         ref.invalidate(activeWorkoutSessionProvider);
       },
       child: sessionsAsync.when(
-        data: (sessions) => _buildSessionsListView(sessions, activeSessionAsync),
+        data: (sessions) =>
+            _buildSessionsListView(sessions, activeSessionAsync),
         loading: () => const LoadingIndicator(),
         error: (error, stackTrace) => ErrorMessage(
           message: error.toString(),
@@ -156,7 +144,10 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
     );
   }
 
-  Widget _buildSessionsListView(List<WorkoutSession> sessions, AsyncValue<WorkoutSession?> activeSessionAsync) {
+  Widget _buildSessionsListView(
+    List<WorkoutSession> sessions,
+    AsyncValue<WorkoutSession?> activeSessionAsync,
+  ) {
     if (sessions.isEmpty) {
       return _buildEmptyState();
     }
@@ -179,7 +170,7 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
 
         final session = sessions[index];
         final isActive = activeSessionAsync.when(
-          data: (activeSession) => activeSession?.sessionId == session.sessionId,
+          data: (activeSession) => activeSession?.id == session.id,
           loading: () => false,
           error: (_, __) => false,
         );
@@ -215,15 +206,15 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
           Text(
             'No workout sessions yet',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
+              color: Theme.of(context).disabledColor,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Create your first workout session to get started',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
+              color: Theme.of(context).disabledColor,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -266,21 +257,33 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
                     label: const Text('Planned'),
                     selected: tempStatus == WorkoutSessionStatus.planned,
                     onSelected: (selected) {
-                      setState(() => tempStatus = selected ? WorkoutSessionStatus.planned : null);
+                      setState(
+                        () => tempStatus = selected
+                            ? WorkoutSessionStatus.planned
+                            : null,
+                      );
                     },
                   ),
                   FilterChip(
                     label: const Text('In Progress'),
                     selected: tempStatus == WorkoutSessionStatus.inProgress,
                     onSelected: (selected) {
-                      setState(() => tempStatus = selected ? WorkoutSessionStatus.inProgress : null);
+                      setState(
+                        () => tempStatus = selected
+                            ? WorkoutSessionStatus.inProgress
+                            : null,
+                      );
                     },
                   ),
                   FilterChip(
                     label: const Text('Completed'),
                     selected: tempStatus == WorkoutSessionStatus.completed,
                     onSelected: (selected) {
-                      setState(() => tempStatus = selected ? WorkoutSessionStatus.completed : null);
+                      setState(
+                        () => tempStatus = selected
+                            ? WorkoutSessionStatus.completed
+                            : null,
+                      );
                     },
                   ),
                 ],
@@ -289,9 +292,11 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
               Text('Date Range', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               ListTile(
-                title: Text(tempDateRange != null
-                    ? '${_formatDate(tempDateRange!.start)} - ${_formatDate(tempDateRange!.end)}'
-                    : 'All dates'),
+                title: Text(
+                  tempDateRange != null
+                      ? '${_formatDate(tempDateRange!.start)} - ${_formatDate(tempDateRange!.end)}'
+                      : 'All dates',
+                ),
                 trailing: tempDateRange != null
                     ? IconButton(
                         icon: const Icon(Icons.clear),
@@ -301,7 +306,9 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
                 onTap: () async {
                   final range = await showDateRangePicker(
                     context: context,
-                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    firstDate: DateTime.now().subtract(
+                      const Duration(days: 365),
+                    ),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                     initialDateRange: tempDateRange,
                   );
@@ -340,7 +347,7 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
         _selectedStatus = tempStatus;
         _dateRange = tempDateRange;
       });
-      
+
       // Refresh the current tab's data
       final filter = _getCurrentFilter();
       ref.invalidate(workoutSessionsProvider(filter));
@@ -352,16 +359,16 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
   }
 
   void _navigateToCreateSession() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         builder: (context) => const WorkoutSessionFormScreen(),
       ),
     );
   }
 
   void _navigateToEditSession(WorkoutSession session) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         builder: (context) => WorkoutSessionFormScreen(session: session),
       ),
     );
@@ -388,19 +395,21 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
 
   Future<void> _startSession(WorkoutSession session) async {
     try {
-      await ref.read(activeWorkoutSessionProvider.notifier).startSession(session.sessionId);
-      
+      await ref
+          .read(activeWorkoutSessionProvider.notifier)
+          .startSession(session.id);
+
       if (mounted) {
         // Convert WorkoutSession to Workout for compatibility
         final workout = WorkoutConverter.convertFromWorkoutSession(session);
-        
+
         // Create service instances
         final services = _createServices();
         final workoutService = services['workoutService'] as WorkoutService;
         final authService = services['authService'] as AuthService;
-        
-        Navigator.of(context).push(
-          MaterialPageRoute(
+
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
             builder: (context) => WorkoutTrackingScreenRiverpod(
               workout: workout,
               workoutService: workoutService,
@@ -433,14 +442,14 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
   void _resumeSession(WorkoutSession session) {
     // Convert WorkoutSession to Workout for compatibility
     final workout = WorkoutConverter.convertFromWorkoutSession(session);
-    
+
     // Create service instances
     final services = _createServices();
     final workoutService = services['workoutService'] as WorkoutService;
     final authService = services['authService'] as AuthService;
-    
-    Navigator.of(context).push(
-      MaterialPageRoute(
+
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         builder: (context) => WorkoutTrackingScreenRiverpod(
           workout: workout,
           workoutService: workoutService,
@@ -485,8 +494,10 @@ class _WorkoutSessionsScreenState extends ConsumerState<WorkoutSessionsScreen>
     if (confirmed == true) {
       try {
         final filter = _getCurrentFilter();
-        await ref.read(workoutSessionsProvider(filter).notifier).deleteSession(session.sessionId);
-        
+        await ref
+            .read(workoutSessionsProvider(filter).notifier)
+            .deleteSession(session.id);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Session deleted successfully')),

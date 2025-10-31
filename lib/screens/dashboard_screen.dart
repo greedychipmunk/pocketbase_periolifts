@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/workout_service.dart';
 import '../services/workout_session_service.dart';
-import '../services/workout_history_service.dart';
 import '../services/auth_service.dart';
 import '../models/workout.dart';
 import '../models/workout_history.dart';
+import '../providers/workout_history_providers.dart';
 import '../widgets/base_layout.dart';
 import '../widgets/workout_history_card.dart';
 import 'workout_tracking_screen_riverpod.dart';
@@ -20,97 +20,56 @@ class DashboardScreen extends ConsumerStatefulWidget {
   final Future<void> Function()? onLogout;
 
   const DashboardScreen({
-    Key? key,
+    super.key,
     required this.workoutService,
     required this.workoutSessionService,
     required this.authService,
     required this.onAuthError,
     this.onLogout,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  late WorkoutHistoryService _workoutHistoryService;
-  List<WorkoutHistoryEntry> _workoutHistory = [];
   Workout? _todayWorkout;
-  bool _isLoading = true;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _workoutHistoryService = WorkoutHistoryService(
-      databases: widget.workoutService.databases,
-      client: widget.authService.client,
-    );
-    _loadWorkoutData();
+    _loadTodayWorkout();
   }
 
-  Future<void> _loadWorkoutData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> _loadTodayWorkout() async {
+    // TODO: Implement proper next workout provider once getNextThreeWorkouts is available
+    // For now, skip today's workout functionality since the method doesn't exist yet
     try {
-      // Get today's workout
-      final nextWorkouts = await widget.workoutService.getNextThreeWorkouts();
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-
-      // Check if there's a workout scheduled for today
-      Workout? todayWorkout;
-      if (nextWorkouts.isNotEmpty) {
-        final firstWorkout = nextWorkouts.first;
-        final workoutDate = DateTime(
-          firstWorkout.scheduledDate.year,
-          firstWorkout.scheduledDate.month,
-          firstWorkout.scheduledDate.day,
-        );
-
-        // Only show if it's scheduled for today and not completed
-        if (workoutDate.isAtSameMomentAs(today) && !firstWorkout.isCompleted) {
-          todayWorkout = firstWorkout;
-        }
-      }
-
-      // Get workout history (past 30 days)
-      final workoutHistory = await _workoutHistoryService.getWorkoutHistory(
-        limit: 10,
-      );
-
+      // Placeholder: This would use widget.workoutService.getNextThreeWorkouts()
+      // but that method doesn't exist in the service yet
+      
+      // For now, set to null to hide the section
       if (mounted) {
         setState(() {
-          _todayWorkout = todayWorkout;
-          _workoutHistory = workoutHistory;
-          _isLoading = false;
+          _todayWorkout = null;
+          _errorMessage = null;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
-          _isLoading = false;
+          _errorMessage = 'Error loading today\'s workout: $e';
         });
       }
     }
   }
 
-  Future<void> _handleError(BuildContext context, Object error) async {
-    if (error is AuthenticationException) {
-      widget.onAuthError();
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $error')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Use the recent workout history provider instead of manual service instantiation
+    final workoutHistoryAsync = ref.watch(recentWorkoutHistoryProvider);
+    
     return BaseLayout(
       workoutService: widget.workoutService,
       workoutSessionService: widget.workoutSessionService,
@@ -119,58 +78,55 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       onLogout: widget.onLogout,
       currentIndex: 0, // Home tab
       title: AppConstants.appName,
-      child: _buildContent(),
+      child: RefreshIndicator(
+        onRefresh: () async {
+          // Refresh both today's workout and workout history
+          await _loadTodayWorkout();
+          ref.invalidate(recentWorkoutHistoryProvider);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Today's Workout Section (if exists)
+              if (_todayWorkout != null) ...[
+                _buildTodayWorkoutSection(),
+                const SizedBox(height: 24),
+              ],
+
+              // Error message for today's workout (if any)
+              if (_errorMessage != null) ...[
+                _buildErrorCard(_errorMessage!),
+                const SizedBox(height: 24),
+              ],
+
+              // Past Workouts Section - Using provider
+              _buildPastWorkoutsSection(workoutHistoryAsync),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildContent() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Error loading data',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage!,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadWorkoutData,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadWorkoutData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+  Widget _buildErrorCard(String message) {
+    return Card(
+      elevation: 2.0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Today's Workout Section (if exists)
-            if (_todayWorkout != null) ...[
-              _buildTodayWorkoutSection(),
-              const SizedBox(height: 24),
-            ],
-
-            // Past Workouts Section
-            _buildPastWorkoutsSection(),
+            Icon(Icons.warning, color: Colors.orange[700]),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
           ],
         ),
       ),
@@ -326,7 +282,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildPastWorkoutsSection() {
+  Widget _buildPastWorkoutsSection(AsyncValue<List<WorkoutHistoryEntry>> workoutHistoryAsync) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -357,19 +313,70 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
         const SizedBox(height: 16.0),
-        if (_workoutHistory.isEmpty)
-          _buildEmptyState()
-        else
-          ..._workoutHistory.map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: WorkoutHistoryCard(
-                entry: entry,
-                onTap: () => _navigateToWorkoutDetail(entry),
-              ),
+        
+        // Use AsyncValue to handle loading, error, and data states
+        workoutHistoryAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
             ),
           ),
+          error: (error, stackTrace) => _buildErrorSection(error.toString()),
+          data: (workoutHistory) {
+            if (workoutHistory.isEmpty) {
+              return _buildEmptyState();
+            }
+            
+            return Column(
+              children: workoutHistory.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: WorkoutHistoryCard(
+                    entry: entry,
+                    onTap: () => _navigateToWorkoutDetail(entry),
+                  ),
+                ),
+              ).toList(),
+            );
+          },
+        ),
       ],
+    );
+  }
+
+  Widget _buildErrorSection(String errorMessage) {
+    return Card(
+      elevation: 2.0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading workout history',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(recentWorkoutHistoryProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -405,7 +412,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _navigateToWorkoutDetail(WorkoutHistoryEntry entry) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (context) => WorkoutHistoryDetailScreen(entry: entry),
       ),
     );
@@ -414,12 +421,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _startWorkout(BuildContext context, Workout workout) async {
     // Check if workout has exercises
     if (workout.exercises.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This workout has no exercises to track'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This workout has no exercises to track'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
       return;
     }
 
@@ -428,26 +437,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       Workout actualWorkout = workout;
       if (workout.id.contains('-workout-')) {
         // This is a placeholder, create a real workout document
-        actualWorkout = await widget.workoutService.createWorkout(workout);
+        final createResult = await widget.workoutService.createWorkout(workout);
+        actualWorkout = createResult.getOrThrow();
       }
 
       // Navigate to workout tracking screen
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => WorkoutTrackingScreenRiverpod(
-            workout: actualWorkout,
-            workoutService: widget.workoutService,
-            authService: widget.authService,
-            onAuthError: widget.onAuthError,
+      if (context.mounted) {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute<bool>(
+            builder: (context) => WorkoutTrackingScreenRiverpod(
+              workout: actualWorkout,
+              workoutService: widget.workoutService,
+              authService: widget.authService,
+              onAuthError: widget.onAuthError,
+            ),
           ),
-        ),
-      );
+        );
 
-      // If workout was completed, refresh the dashboard
-      if (result == true && mounted) {
-        // Reload the workout data to reflect the completion
-        _loadWorkoutData();
+        // If workout was completed, refresh the dashboard
+        if (result == true && mounted) {
+          // Reload both today's workout and workout history
+          await _loadTodayWorkout();
+          // Invalidate and refresh the workout history provider
+          ref.invalidate(recentWorkoutHistoryProvider);
+        }
       }
     } catch (e) {
       if (context.mounted) {
