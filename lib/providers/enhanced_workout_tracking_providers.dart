@@ -74,18 +74,16 @@ class EnhancedWorkoutTrackingNotifier
 
       // Initialize with first exercise selected and exercise selection view
       final initialCompletedSets = _originalWorkout.exercises
-          .map((exercise) => List<bool>.filled(exercise.sets, false))
+          .map((exercise) => List<bool>.filled(exercise.sets.length, false))
           .toList();
 
       final initialModifiedSets = _originalWorkout.exercises
           .map(
-            (exercise) => List<WorkoutSet>.generate(
-              exercise.sets,
-              (index) => WorkoutSet(
-                reps: exercise.reps,
-                weight: exercise.weight ?? 0.0,
-              ),
-            ),
+            (exercise) => exercise.sets.map((set) => WorkoutSet(
+              reps: set.reps,
+              weight: set.weight,
+              restTime: set.restTime,
+            )).toList(),
           )
           .toList();
 
@@ -591,7 +589,7 @@ final enhancedWorkoutProgressProvider =
             data: (state) {
               final totalSets = state.workout.exercises.fold(
                 0,
-                (sum, exercise) => sum + exercise.sets,
+                (sum, exercise) => sum + exercise.sets.length,
               );
               if (totalSets == 0) return 0.0;
 

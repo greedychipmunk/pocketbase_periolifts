@@ -1,4 +1,5 @@
 import 'package:pocketbase/pocketbase.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/error_handler.dart';
 import 'base_model.dart';
 import 'dart:convert';
@@ -93,17 +94,8 @@ class WorkoutExercise {
   /// Cached exercise name for display purposes
   final String exerciseName;
 
-  /// Planned number of sets for this exercise
-  final int sets;
-
-  /// Planned number of repetitions per set
-  final int reps;
-
-  /// Optional weight to be used (in user's preferred unit)
-  final double? weight;
-
-  /// Optional rest time between sets (in seconds)
-  final int? restTime;
+  /// List of sets for this exercise
+  final List<WorkoutSet> sets;
 
   /// Optional notes for this exercise in the workout
   final String? notes;
@@ -112,20 +104,73 @@ class WorkoutExercise {
     required this.exerciseId,
     required this.exerciseName,
     required this.sets,
-    required this.reps,
-    this.weight,
-    this.restTime,
     this.notes,
   });
 
+  /// Legacy factory constructor for creating exercises with uniform sets
+  /// 
+  /// This is useful for testing and simple workout creation where all sets
+  /// have the same reps, weight, and rest time.
+  factory WorkoutExercise.uniform({
+    required String exerciseId,
+    required String exerciseName,
+    required int sets,
+    required int reps,
+    double? weight,
+    int? restTime,
+    String? notes,
+  }) {
+    return WorkoutExercise(
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      sets: List.generate(
+        sets,
+        (_) => WorkoutSet(
+          reps: reps,
+          weight: weight ?? 0.0,
+          restTime: restTime != null ? Duration(seconds: restTime) : null,
+        ),
+      ),
+      notes: notes,
+    );
+  }
+
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
+    // Parse sets - can be either a list of set objects or a simple integer
+    List<WorkoutSet> parseSets() {
+      final setsData = json['sets'];
+      if (setsData is List) {
+        return setsData.map((setJson) {
+          if (setJson is Map<String, dynamic>) {
+            return WorkoutSet.fromJson(setJson);
+          }
+          // Skip invalid set data instead of creating invalid sets
+          return null;
+        }).whereType<WorkoutSet>().toList();
+      } else if (setsData is int && setsData > 0) {
+        // Legacy format: create sets based on count with default reps/weight
+        final reps = json['reps'] as int? ?? 10;
+        final weight = (json['weight'] as num?)?.toDouble() ?? 0.0;
+        final restTime = json['rest_time'] != null
+            ? Duration(seconds: json['rest_time'] as int)
+            : null;
+        
+        return List.generate(
+          setsData,
+          (_) => WorkoutSet(
+            reps: reps,
+            weight: weight,
+            restTime: restTime,
+          ),
+        );
+      }
+      return [];
+    }
+
     return WorkoutExercise(
       exerciseId: json['exercise_id']?.toString() ?? '',
       exerciseName: json['exercise_name']?.toString() ?? '',
-      sets: json['sets'] as int? ?? 1,
-      reps: json['reps'] as int? ?? 1,
-      weight: (json['weight'] as num?)?.toDouble(),
-      restTime: json['rest_time'] as int?,
+      sets: parseSets(),
       notes: json['notes']?.toString(),
     );
   }
@@ -134,10 +179,7 @@ class WorkoutExercise {
     return {
       'exercise_id': exerciseId,
       'exercise_name': exerciseName,
-      'sets': sets,
-      'reps': reps,
-      'weight': weight,
-      'rest_time': restTime,
+      'sets': sets.map((set) => set.toJson()).toList(),
       'notes': notes,
     };
   }
@@ -145,19 +187,13 @@ class WorkoutExercise {
   WorkoutExercise copyWith({
     String? exerciseId,
     String? exerciseName,
-    int? sets,
-    int? reps,
-    double? weight,
-    int? restTime,
+    List<WorkoutSet>? sets,
     String? notes,
   }) {
     return WorkoutExercise(
       exerciseId: exerciseId ?? this.exerciseId,
       exerciseName: exerciseName ?? this.exerciseName,
       sets: sets ?? this.sets,
-      reps: reps ?? this.reps,
-      weight: weight ?? this.weight,
-      restTime: restTime ?? this.restTime,
       notes: notes ?? this.notes,
     );
   }
@@ -168,10 +204,7 @@ class WorkoutExercise {
     return other is WorkoutExercise &&
         other.exerciseId == exerciseId &&
         other.exerciseName == exerciseName &&
-        other.sets == sets &&
-        other.reps == reps &&
-        other.weight == weight &&
-        other.restTime == restTime &&
+        listEquals(other.sets, sets) &&
         other.notes == notes;
   }
 
@@ -180,17 +213,133 @@ class WorkoutExercise {
     return Object.hash(
       exerciseId,
       exerciseName,
-      sets,
-      reps,
-      weight,
-      restTime,
+      Object.hashAll(sets),
       notes,
     );
   }
 
   @override
   String toString() {
-    return 'WorkoutExercise(exerciseId: $exerciseId, name: $exerciseName, sets: $sets, reps: $reps)';
+    return 'WorkoutExercise(exerciseId: $exerciseId, name: $exerciseName, sets: ${sets.length})';
+  }
+}
+
+/// Progress tracking data for in-progress workouts
+///
+/// Stores the current state of a workout in progress, including which
+/// exercise and set the user is on, and tracking completion status.
+class WorkoutProgress {
+  /// Current exercise index in the workout
+  final int currentExerciseIndex;
+
+  /// Current set index within the current exercise
+  final int currentSetIndex;
+
+  /// Completion status for each set in each exercise
+  final List<List<bool>> completedSets;
+
+  /// Modified set values for each exercise
+  final List<List<WorkoutSet>> modifiedSets;
+
+  /// Timestamp when progress was last saved
+  final DateTime lastSavedAt;
+
+  const WorkoutProgress({
+    required this.currentExerciseIndex,
+    required this.currentSetIndex,
+    required this.completedSets,
+    required this.modifiedSets,
+    required this.lastSavedAt,
+  });
+
+  factory WorkoutProgress.fromJson(Map<String, dynamic> json) {
+    return WorkoutProgress(
+      currentExerciseIndex: json['current_exercise_index'] as int? ?? 0,
+      currentSetIndex: json['current_set_index'] as int? ?? 0,
+      completedSets: _parseCompletedSets(json['completed_sets']),
+      modifiedSets: _parseModifiedSets(json['modified_sets']),
+      lastSavedAt: json['last_saved_at'] != null
+          ? DateTime.parse(json['last_saved_at'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'current_exercise_index': currentExerciseIndex,
+      'current_set_index': currentSetIndex,
+      'completed_sets': completedSets,
+      'modified_sets': modifiedSets
+          .map((exerciseSets) => exerciseSets.map((set) => set.toJson()).toList())
+          .toList(),
+      'last_saved_at': lastSavedAt.toIso8601String(),
+    };
+  }
+
+  WorkoutProgress copyWith({
+    int? currentExerciseIndex,
+    int? currentSetIndex,
+    List<List<bool>>? completedSets,
+    List<List<WorkoutSet>>? modifiedSets,
+    DateTime? lastSavedAt,
+  }) {
+    return WorkoutProgress(
+      currentExerciseIndex: currentExerciseIndex ?? this.currentExerciseIndex,
+      currentSetIndex: currentSetIndex ?? this.currentSetIndex,
+      completedSets: completedSets ?? this.completedSets,
+      modifiedSets: modifiedSets ?? this.modifiedSets,
+      lastSavedAt: lastSavedAt ?? this.lastSavedAt,
+    );
+  }
+
+  static List<List<bool>> _parseCompletedSets(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((exerciseSets) {
+        if (exerciseSets is List) {
+          return exerciseSets.map((set) => set == true).toList();
+        }
+        return <bool>[];
+      }).toList();
+    }
+    return [];
+  }
+
+  static List<List<WorkoutSet>> _parseModifiedSets(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((exerciseSets) {
+        if (exerciseSets is List) {
+          return exerciseSets.map((set) {
+            if (set is Map<String, dynamic>) {
+              return WorkoutSet.fromJson(set);
+            }
+            // Skip invalid set data
+            return null;
+          }).whereType<WorkoutSet>().toList();
+        }
+        return <WorkoutSet>[];
+      }).toList();
+    }
+    return [];
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is WorkoutProgress &&
+        other.currentExerciseIndex == currentExerciseIndex &&
+        other.currentSetIndex == currentSetIndex;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(currentExerciseIndex, currentSetIndex);
+  }
+
+  @override
+  String toString() {
+    return 'WorkoutProgress(exercise: $currentExerciseIndex, set: $currentSetIndex, lastSaved: $lastSavedAt)';
   }
 }
 
@@ -216,15 +365,35 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
   @override
   final String userId;
 
+  /// Scheduled date for this workout
+  final DateTime? scheduledDate;
+
+  /// Whether this workout has been completed
+  final bool isCompleted;
+
+  /// Date when the workout was completed
+  final DateTime? completedDate;
+
+  /// Whether this workout is currently in progress
+  final bool isInProgress;
+
+  /// Progress data for in-progress workouts
+  final WorkoutProgress? progress;
+
   const Workout({
     required super.id,
     required super.created,
     required super.updated,
     required this.name,
     this.description,
-    required this.estimatedDuration,
+    this.estimatedDuration = 0,
     required this.exercises,
     required this.userId,
+    this.scheduledDate,
+    this.isCompleted = false,
+    this.completedDate,
+    this.isInProgress = false,
+    this.progress,
   });
 
   /// Create a Workout from PocketBase JSON response
@@ -241,6 +410,17 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
         estimatedDuration: json['estimated_duration'] as int? ?? 0,
         exercises: _parseExercises(json['exercises']),
         userId: json['user_id']?.toString() ?? '',
+        scheduledDate: json['scheduled_date'] != null
+            ? DateTime.parse(json['scheduled_date'] as String)
+            : null,
+        isCompleted: json['is_completed'] as bool? ?? false,
+        completedDate: json['completed_date'] != null
+            ? DateTime.parse(json['completed_date'] as String)
+            : null,
+        isInProgress: json['is_in_progress'] as bool? ?? false,
+        progress: json['progress'] != null
+            ? WorkoutProgress.fromJson(json['progress'] as Map<String, dynamic>)
+            : null,
       );
     } catch (e) {
       throw ValidationException(
@@ -267,6 +447,13 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
         estimatedDuration: record.get<int>('estimated_duration', 0),
         exercises: _parseExercises(record.get<dynamic>('exercises')),
         userId: record.get<String>('user_id', ''),
+        scheduledDate: _parseDate(record.get<String>('scheduled_date')),
+        isCompleted: record.get<bool>('is_completed', false),
+        completedDate: _parseDate(record.get<String>('completed_date')),
+        isInProgress: record.get<bool>('is_in_progress', false),
+        progress: record.get<dynamic>('progress') != null
+            ? WorkoutProgress.fromJson(record.get<dynamic>('progress') as Map<String, dynamic>)
+            : null,
       );
     } catch (e) {
       throw ValidationException(
@@ -299,6 +486,11 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
       'estimated_duration': estimatedDuration,
       'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
       'user_id': userId.isEmpty ? null : userId,
+      'scheduled_date': scheduledDate?.toIso8601String(),
+      'is_completed': isCompleted,
+      'completed_date': completedDate?.toIso8601String(),
+      'is_in_progress': isInProgress,
+      'progress': progress?.toJson(),
     };
   }
 
@@ -313,6 +505,11 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
     int? estimatedDuration,
     List<WorkoutExercise>? exercises,
     String? userId,
+    DateTime? scheduledDate,
+    bool? isCompleted,
+    DateTime? completedDate,
+    bool? isInProgress,
+    WorkoutProgress? progress,
   }) {
     return Workout(
       id: id ?? this.id,
@@ -323,6 +520,11 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
       estimatedDuration: estimatedDuration ?? this.estimatedDuration,
       exercises: exercises ?? this.exercises,
       userId: userId ?? this.userId,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      isCompleted: isCompleted ?? this.isCompleted,
+      completedDate: completedDate ?? this.completedDate,
+      isInProgress: isInProgress ?? this.isInProgress,
+      progress: progress ?? this.progress,
     );
   }
 
@@ -346,15 +548,13 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
           return const WorkoutExercise(
             exerciseId: '',
             exerciseName: 'Invalid Exercise',
-            sets: 1,
-            reps: 1,
+            sets: [],
           );
         }
         return const WorkoutExercise(
           exerciseId: '',
           exerciseName: 'Unknown Exercise',
-          sets: 1,
-          reps: 1,
+          sets: [],
         );
       }).toList();
     }
@@ -364,14 +564,14 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
 
   /// Calculate total estimated sets across all exercises
   int get totalSets {
-    return exercises.fold(0, (total, exercise) => total + exercise.sets);
+    return exercises.fold(0, (total, exercise) => total + exercise.sets.length);
   }
 
   /// Calculate total estimated repetitions across all exercises
   int get totalReps {
     return exercises.fold(
       0,
-      (total, exercise) => total + (exercise.sets * exercise.reps),
+      (total, exercise) => total + exercise.sets.fold(0, (sum, set) => sum + set.reps),
     );
   }
 
@@ -435,24 +635,30 @@ class Workout extends BasePocketBaseModel with UserOwnedModel {
         errors.add('Exercise ${i + 1}: Exercise name cannot be empty');
       }
 
-      if (exercise.sets < 1 || exercise.sets > 20) {
-        errors.add('Exercise ${i + 1}: Sets must be between 1 and 20');
+      if (exercise.sets.isEmpty) {
+        errors.add('Exercise ${i + 1}: Must have at least one set');
+      } else if (exercise.sets.length > 20) {
+        errors.add('Exercise ${i + 1}: Cannot have more than 20 sets');
       }
 
-      if (exercise.reps < 1 || exercise.reps > 100) {
-        errors.add('Exercise ${i + 1}: Reps must be between 1 and 100');
-      }
+      // Validate individual sets
+      for (int j = 0; j < exercise.sets.length; j++) {
+        final set = exercise.sets[j];
+        
+        if (set.reps < 1 || set.reps > 100) {
+          errors.add('Exercise ${i + 1}, Set ${j + 1}: Reps must be between 1 and 100');
+        }
 
-      if (exercise.weight != null &&
-          (exercise.weight! < 0 || exercise.weight! > 1000)) {
-        errors.add('Exercise ${i + 1}: Weight must be between 0 and 1000');
-      }
+        if (set.weight < 0 || set.weight > 1000) {
+          errors.add('Exercise ${i + 1}, Set ${j + 1}: Weight must be between 0 and 1000');
+        }
 
-      if (exercise.restTime != null &&
-          (exercise.restTime! < 0 || exercise.restTime! > 600)) {
-        errors.add(
-          'Exercise ${i + 1}: Rest time must be between 0 and 600 seconds',
-        );
+        if (set.restTime != null &&
+            (set.restTime!.inSeconds < 0 || set.restTime!.inSeconds > 600)) {
+          errors.add(
+            'Exercise ${i + 1}, Set ${j + 1}: Rest time must be between 0 and 600 seconds',
+          );
+        }
       }
     }
 
