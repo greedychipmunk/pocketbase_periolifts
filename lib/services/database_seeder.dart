@@ -265,10 +265,14 @@ class DatabaseSeeder {
           (exercise) => WorkoutExercise(
             exerciseId: exercise.id,
             exerciseName: exercise.name,
-            sets: 3,
-            reps: 10,
-            weight: 50.0,
-            restTime: 120, // 2 minutes
+            sets: List.generate(
+              3,
+              (_) => WorkoutSet(
+                reps: 10,
+                weight: 50.0,
+                restTime: const Duration(seconds: 120),
+              ),
+            ),
           ),
         )
         .toList();
@@ -298,10 +302,14 @@ class DatabaseSeeder {
           (exercise) => WorkoutExercise(
             exerciseId: exercise.id,
             exerciseName: exercise.name,
-            sets: 3,
-            reps: 10,
-            weight: 40.0,
-            restTime: 120, // 2 minutes
+            sets: List.generate(
+              3,
+              (_) => WorkoutSet(
+                reps: 10,
+                weight: 40.0,
+                restTime: const Duration(seconds: 120),
+              ),
+            ),
           ),
         )
         .toList();
@@ -331,10 +339,14 @@ class DatabaseSeeder {
           (exercise) => WorkoutExercise(
             exerciseId: exercise.id,
             exerciseName: exercise.name,
-            sets: 3,
-            reps: 12,
-            weight: 80.0,
-            restTime: 180, // 3 minutes
+            sets: List.generate(
+              3,
+              (_) => WorkoutSet(
+                reps: 12,
+                weight: 80.0,
+                restTime: const Duration(seconds: 180),
+              ),
+            ),
           ),
         )
         .toList();
