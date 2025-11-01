@@ -1,4 +1,5 @@
 import 'package:pocketbase/pocketbase.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/error_handler.dart';
 import 'base_model.dart';
 import 'dart:convert';
@@ -202,6 +203,7 @@ class WorkoutExercise {
     return other is WorkoutExercise &&
         other.exerciseId == exerciseId &&
         other.exerciseName == exerciseName &&
+        listEquals(other.sets, sets) &&
         other.notes == notes;
   }
 
@@ -210,6 +212,7 @@ class WorkoutExercise {
     return Object.hash(
       exerciseId,
       exerciseName,
+      Object.hashAll(sets),
       notes,
     );
   }
