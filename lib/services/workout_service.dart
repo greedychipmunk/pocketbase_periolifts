@@ -411,43 +411,48 @@ class WorkoutService extends BasePocketBaseService {
     }
 
     // Validate sets count
-    if (exercise.sets < 1 || exercise.sets > 20) {
+    if (exercise.sets.isEmpty || exercise.sets.length > 20) {
       return Result.error(
         AppError.validation(
           message: 'Exercise must have between 1 and 20 sets',
-          details: {'field': 'exercises[$index].sets', 'value': exercise.sets},
+          details: {'field': 'exercises[$index].sets', 'value': exercise.sets.length},
         ),
       );
     }
 
-    // Validate reps count
-    if (exercise.reps < 1 || exercise.reps > 100) {
-      return Result.error(
-        AppError.validation(
-          message: 'Exercise reps must be between 1 and 100',
-          details: {'field': 'exercises[$index].reps', 'value': exercise.reps},
-        ),
-      );
-    }
+    // Validate individual sets
+    for (int setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
+      final set = exercise.sets[setIndex];
+      
+      // Validate reps count
+      if (set.reps < 1 || set.reps > 100) {
+        return Result.error(
+          AppError.validation(
+            message: 'Set reps must be between 1 and 100',
+            details: {'field': 'exercises[$index].sets[$setIndex].reps', 'value': set.reps},
+          ),
+        );
+      }
 
-    // Validate weight if provided
-    if (exercise.weight != null && exercise.weight! < 0) {
-      return Result.error(
-        AppError.validation(
-          message: 'Exercise weight cannot be negative',
-          details: {'field': 'exercises[$index].weight'},
-        ),
-      );
-    }
+      // Validate weight if provided
+      if (set.weight < 0) {
+        return Result.error(
+          AppError.validation(
+            message: 'Set weight cannot be negative',
+            details: {'field': 'exercises[$index].sets[$setIndex].weight'},
+          ),
+        );
+      }
 
-    // Validate rest time if provided
-    if (exercise.restTime != null && exercise.restTime! < 0) {
-      return Result.error(
-        AppError.validation(
-          message: 'Rest time cannot be negative',
-          details: {'field': 'exercises[$index].restTime'},
-        ),
-      );
+      // Validate rest time if provided
+      if (set.restTime != null && set.restTime!.inSeconds < 0) {
+        return Result.error(
+          AppError.validation(
+            message: 'Rest time cannot be negative',
+            details: {'field': 'exercises[$index].sets[$setIndex].restTime'},
+          ),
+        );
+      }
     }
 
     return Result.success(null);
