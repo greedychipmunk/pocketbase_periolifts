@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/login_screen.dart';
+import 'screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
+import 'services/workout_service.dart';
+import 'services/workout_session_service.dart';
+import 'services/auth_service.dart';
 import 'config/theme_config.dart';
 import 'constants/app_constants.dart';
 
@@ -23,47 +27,34 @@ class PerioLiftsApp extends ConsumerWidget {
       theme: LightThemeConfig.themeData(),
       darkTheme: DarkThemeConfig.themeData(),
       themeMode: ThemeMode.system,
-      home: _buildHomeScreen(authState),
+      home: _buildHomeScreen(authState, ref),
     );
   }
 
-  Widget _buildHomeScreen(AuthState authState) {
+  Widget _buildHomeScreen(AuthState authState, WidgetRef ref) {
     // Show loading while checking authentication
     if (authState.isLoading && authState.user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Show temporary welcome screen if authenticated
+    // Show DashboardScreen if authenticated
     if (authState.user != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Welcome'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                // TODO: Get ref here to sign out
-                // ref.read(authProvider.notifier).signOut();
-              },
-            ),
-          ],
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Welcome, ${authState.user?.name ?? 'User'}!',
-                style: const TextStyle(fontSize: 24),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Dashboard coming soon...',
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-        ),
+      // Initialize services
+      final workoutService = WorkoutService();
+      final workoutSessionService = WorkoutSessionService();
+      final authService = ref.read(authServiceProvider);
+
+      return DashboardScreen(
+        workoutService: workoutService,
+        workoutSessionService: workoutSessionService,
+        authService: authService,
+        onAuthError: () {
+          // Handle authentication error by signing out
+          ref.read(authProvider.notifier).signOut();
+        },
+        onLogout: () async {
+          await ref.read(authProvider.notifier).signOut();
+        },
       );
     }
 
