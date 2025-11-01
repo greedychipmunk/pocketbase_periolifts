@@ -106,6 +106,34 @@ class WorkoutExercise {
     this.notes,
   });
 
+  /// Legacy factory constructor for creating exercises with uniform sets
+  /// 
+  /// This is useful for testing and simple workout creation where all sets
+  /// have the same reps, weight, and rest time.
+  factory WorkoutExercise.uniform({
+    required String exerciseId,
+    required String exerciseName,
+    required int sets,
+    required int reps,
+    double? weight,
+    int? restTime,
+    String? notes,
+  }) {
+    return WorkoutExercise(
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      sets: List.generate(
+        sets,
+        (_) => WorkoutSet(
+          reps: reps,
+          weight: weight ?? 0.0,
+          restTime: restTime != null ? Duration(seconds: restTime) : null,
+        ),
+      ),
+      notes: notes,
+    );
+  }
+
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
     // Parse sets - can be either a list of set objects or a simple integer
     List<WorkoutSet> parseSets() {

@@ -167,8 +167,8 @@ void main() {
 
   group('WorkoutExercise Tests', () {
     group('fromJson', () {
-      test('should create WorkoutExercise from valid JSON', () {
-        // Arrange
+      test('should create WorkoutExercise from valid JSON with legacy format', () {
+        // Arrange - legacy format with int sets
         final json = {
           'exercise_id': 'exercise_123',
           'exercise_name': 'Push-up',
@@ -185,10 +185,36 @@ void main() {
         // Assert
         expect(exercise.exerciseId, equals('exercise_123'));
         expect(exercise.exerciseName, equals('Push-up'));
-        expect(exercise.sets, equals(3));
-        expect(exercise.reps, equals(15));
-        expect(exercise.weight, equals(0.0));
-        expect(exercise.restTime, equals(60));
+        expect(exercise.sets.length, equals(3));
+        expect(exercise.sets[0].reps, equals(15));
+        expect(exercise.sets[0].weight, equals(0.0));
+        expect(exercise.sets[0].restTime, equals(const Duration(seconds: 60)));
+        expect(exercise.notes, equals('Keep core tight'));
+      });
+
+      test('should create WorkoutExercise from new format with List<WorkoutSet>', () {
+        // Arrange - new format with List<WorkoutSet>
+        final json = {
+          'exercise_id': 'exercise_123',
+          'exercise_name': 'Push-up',
+          'sets': [
+            {'reps': 15, 'weight': 0.0, 'rest_time': 60},
+            {'reps': 12, 'weight': 0.0, 'rest_time': 60},
+            {'reps': 10, 'weight': 0.0, 'rest_time': 60},
+          ],
+          'notes': 'Keep core tight',
+        };
+
+        // Act
+        final exercise = WorkoutExercise.fromJson(json);
+
+        // Assert
+        expect(exercise.exerciseId, equals('exercise_123'));
+        expect(exercise.exerciseName, equals('Push-up'));
+        expect(exercise.sets.length, equals(3));
+        expect(exercise.sets[0].reps, equals(15));
+        expect(exercise.sets[1].reps, equals(12));
+        expect(exercise.sets[2].reps, equals(10));
         expect(exercise.notes, equals('Keep core tight'));
       });
 
@@ -207,10 +233,8 @@ void main() {
         // Assert
         expect(exercise.exerciseId, equals('exercise_456'));
         expect(exercise.exerciseName, equals('Squat'));
-        expect(exercise.sets, equals(4));
-        expect(exercise.reps, equals(10));
-        expect(exercise.weight, isNull);
-        expect(exercise.restTime, isNull);
+        expect(exercise.sets.length, equals(4));
+        expect(exercise.sets[0].reps, equals(10));
         expect(exercise.notes, isNull);
       });
 
@@ -224,10 +248,7 @@ void main() {
         // Assert
         expect(exercise.exerciseId, equals(''));
         expect(exercise.exerciseName, equals(''));
-        expect(exercise.sets, equals(1));
-        expect(exercise.reps, equals(1));
-        expect(exercise.weight, isNull);
-        expect(exercise.restTime, isNull);
+        expect(exercise.sets, isEmpty);
         expect(exercise.notes, isNull);
       });
     });
@@ -235,13 +256,14 @@ void main() {
     group('toJson', () {
       test('should convert WorkoutExercise to valid JSON', () {
         // Arrange
-        const exercise = WorkoutExercise(
+        final exercise = WorkoutExercise(
           exerciseId: 'exercise_789',
           exerciseName: 'Bench Press',
-          sets: 3,
-          reps: 8,
-          weight: 80.0,
-          restTime: 120,
+          sets: [
+            const WorkoutSet(reps: 8, weight: 80.0, restTime: Duration(seconds: 120)),
+            const WorkoutSet(reps: 8, weight: 80.0, restTime: Duration(seconds: 120)),
+            const WorkoutSet(reps: 8, weight: 80.0, restTime: Duration(seconds: 120)),
+          ],
           notes: 'Progressive overload',
         );
 
@@ -251,10 +273,11 @@ void main() {
         // Assert
         expect(json['exercise_id'], equals('exercise_789'));
         expect(json['exercise_name'], equals('Bench Press'));
-        expect(json['sets'], equals(3));
-        expect(json['reps'], equals(8));
-        expect(json['weight'], equals(80.0));
-        expect(json['rest_time'], equals(120));
+        expect(json['sets'], isList);
+        expect(json['sets'].length, equals(3));
+        expect(json['sets'][0]['reps'], equals(8));
+        expect(json['sets'][0]['weight'], equals(80.0));
+        expect(json['sets'][0]['rest_time'], equals(120));
         expect(json['notes'], equals('Progressive overload'));
       });
 
@@ -263,8 +286,9 @@ void main() {
         const exercise = WorkoutExercise(
           exerciseId: 'exercise_999',
           exerciseName: 'Deadlift',
-          sets: 1,
-          reps: 5,
+          sets: [
+            WorkoutSet(reps: 5, weight: 100.0),
+          ],
         );
 
         // Act
@@ -273,10 +297,8 @@ void main() {
         // Assert
         expect(json['exercise_id'], equals('exercise_999'));
         expect(json['exercise_name'], equals('Deadlift'));
-        expect(json['sets'], equals(1));
-        expect(json['reps'], equals(5));
-        expect(json['weight'], isNull);
-        expect(json['rest_time'], isNull);
+        expect(json['sets'], isList);
+        expect(json['sets'].length, equals(1));
         expect(json['notes'], isNull);
       });
     });
@@ -284,30 +306,34 @@ void main() {
     group('copyWith', () {
       test('should create copy with updated fields', () {
         // Arrange
-        const original = WorkoutExercise(
+        final original = WorkoutExercise(
           exerciseId: 'exercise_original',
           exerciseName: 'Original Exercise',
-          sets: 3,
-          reps: 10,
-          weight: 50.0,
-          restTime: 60,
+          sets: [
+            const WorkoutSet(reps: 10, weight: 50.0, restTime: Duration(seconds: 60)),
+            const WorkoutSet(reps: 10, weight: 50.0, restTime: Duration(seconds: 60)),
+            const WorkoutSet(reps: 10, weight: 50.0, restTime: Duration(seconds: 60)),
+          ],
           notes: 'Original notes',
         );
 
         // Act
         final copy = original.copyWith(
           exerciseName: 'Updated Exercise',
-          sets: 4,
-          weight: 60.0,
+          sets: [
+            const WorkoutSet(reps: 12, weight: 60.0),
+            const WorkoutSet(reps: 12, weight: 60.0),
+            const WorkoutSet(reps: 12, weight: 60.0),
+            const WorkoutSet(reps: 12, weight: 60.0),
+          ],
         );
 
         // Assert
         expect(copy.exerciseId, equals('exercise_original'));
         expect(copy.exerciseName, equals('Updated Exercise'));
-        expect(copy.sets, equals(4));
-        expect(copy.reps, equals(10));
-        expect(copy.weight, equals(60.0));
-        expect(copy.restTime, equals(60));
+        expect(copy.sets.length, equals(4));
+        expect(copy.sets[0].reps, equals(12));
+        expect(copy.sets[0].weight, equals(60.0));
         expect(copy.notes, equals('Original notes'));
       });
     });
@@ -318,20 +344,14 @@ void main() {
         const exercise1 = WorkoutExercise(
           exerciseId: 'exercise_123',
           exerciseName: 'Test Exercise',
-          sets: 3,
-          reps: 10,
-          weight: 50.0,
-          restTime: 60,
+          sets: [],
           notes: 'Test notes',
         );
 
         const exercise2 = WorkoutExercise(
           exerciseId: 'exercise_123',
           exerciseName: 'Test Exercise',
-          sets: 3,
-          reps: 10,
-          weight: 50.0,
-          restTime: 60,
+          sets: [],
           notes: 'Test notes',
         );
 
@@ -345,15 +365,13 @@ void main() {
         const exercise1 = WorkoutExercise(
           exerciseId: 'exercise_123',
           exerciseName: 'Exercise 1',
-          sets: 3,
-          reps: 10,
+          sets: [],
         );
 
         const exercise2 = WorkoutExercise(
           exerciseId: 'exercise_456',
           exerciseName: 'Exercise 2',
-          sets: 3,
-          reps: 10,
+          sets: [],
         );
 
         // Act & Assert
