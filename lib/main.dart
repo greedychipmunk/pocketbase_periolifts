@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
-import 'services/workout_service.dart';
-import 'services/workout_session_service.dart';
-import 'services/auth_service.dart';
+import 'providers/workout_providers.dart';
+import 'providers/workout_session_providers.dart';
 import 'config/theme_config.dart';
 import 'constants/app_constants.dart';
 
@@ -39,18 +38,18 @@ class PerioLiftsApp extends ConsumerWidget {
 
     // Show DashboardScreen if authenticated
     if (authState.user != null) {
-      // Initialize services
-      final workoutService = WorkoutService();
-      final workoutSessionService = WorkoutSessionService();
+      // Use service providers instead of creating new instances
+      final workoutService = ref.read(workoutServiceProvider);
+      final workoutSessionService = ref.read(workoutSessionServiceProvider);
       final authService = ref.read(authServiceProvider);
 
       return DashboardScreen(
         workoutService: workoutService,
         workoutSessionService: workoutSessionService,
         authService: authService,
-        onAuthError: () {
+        onAuthError: () async {
           // Handle authentication error by signing out
-          ref.read(authProvider.notifier).signOut();
+          await ref.read(authProvider.notifier).signOut();
         },
         onLogout: () async {
           await ref.read(authProvider.notifier).signOut();
