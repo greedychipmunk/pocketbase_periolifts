@@ -47,17 +47,16 @@ class PerioLiftsApp extends ConsumerWidget {
         workoutService: workoutService,
         workoutSessionService: workoutSessionService,
         authService: authService,
-        onAuthError: () async {
-          // Handle authentication error by signing out
-          await ref.read(authProvider.notifier).signOut();
-        },
-        onLogout: () async {
-          await ref.read(authProvider.notifier).signOut();
-        },
+        onAuthError: () => _handleSignOut(ref),
+        onLogout: () => _handleSignOut(ref),
       );
     }
 
     // Show login screen if not authenticated
     return const LoginScreen();
+  }
+
+  Future<void> _handleSignOut(WidgetRef ref) async {
+    await ref.read(authProvider.notifier).signOut();
   }
 }
