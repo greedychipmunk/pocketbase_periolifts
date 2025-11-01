@@ -82,8 +82,17 @@ PerioLifts is built using a modern, scalable architecture:
    - Configure collections using the provided schema
 
 4. **Configure environment**:
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env with your configuration
+   # At minimum, set POCKETBASE_ADMIN_EMAIL and POCKETBASE_ADMIN_PASSWORD for scripts
+   ```
+   
+   Or manually update:
    ```dart
-   // Update lib/constants/app_constants.dart
+   // lib/constants/app_constants.dart
    static const String pocketBaseDevUrl = 'http://localhost:8090';
    ```
 
