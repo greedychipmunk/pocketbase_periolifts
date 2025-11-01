@@ -194,6 +194,124 @@ class WorkoutExercise {
   }
 }
 
+/// Progress tracking data for in-progress workouts
+///
+/// Stores the current state of a workout in progress, including which
+/// exercise and set the user is on, and tracking completion status.
+class WorkoutProgress {
+  /// Current exercise index in the workout
+  final int currentExerciseIndex;
+
+  /// Current set index within the current exercise
+  final int currentSetIndex;
+
+  /// Completion status for each set in each exercise
+  final List<List<bool>> completedSets;
+
+  /// Modified set values for each exercise
+  final List<List<WorkoutSet>> modifiedSets;
+
+  /// Timestamp when progress was last saved
+  final DateTime lastSavedAt;
+
+  const WorkoutProgress({
+    required this.currentExerciseIndex,
+    required this.currentSetIndex,
+    required this.completedSets,
+    required this.modifiedSets,
+    required this.lastSavedAt,
+  });
+
+  factory WorkoutProgress.fromJson(Map<String, dynamic> json) {
+    return WorkoutProgress(
+      currentExerciseIndex: json['current_exercise_index'] as int? ?? 0,
+      currentSetIndex: json['current_set_index'] as int? ?? 0,
+      completedSets: _parseCompletedSets(json['completed_sets']),
+      modifiedSets: _parseModifiedSets(json['modified_sets']),
+      lastSavedAt: json['last_saved_at'] != null
+          ? DateTime.parse(json['last_saved_at'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'current_exercise_index': currentExerciseIndex,
+      'current_set_index': currentSetIndex,
+      'completed_sets': completedSets,
+      'modified_sets': modifiedSets
+          .map((exerciseSets) => exerciseSets.map((set) => set.toJson()).toList())
+          .toList(),
+      'last_saved_at': lastSavedAt.toIso8601String(),
+    };
+  }
+
+  WorkoutProgress copyWith({
+    int? currentExerciseIndex,
+    int? currentSetIndex,
+    List<List<bool>>? completedSets,
+    List<List<WorkoutSet>>? modifiedSets,
+    DateTime? lastSavedAt,
+  }) {
+    return WorkoutProgress(
+      currentExerciseIndex: currentExerciseIndex ?? this.currentExerciseIndex,
+      currentSetIndex: currentSetIndex ?? this.currentSetIndex,
+      completedSets: completedSets ?? this.completedSets,
+      modifiedSets: modifiedSets ?? this.modifiedSets,
+      lastSavedAt: lastSavedAt ?? this.lastSavedAt,
+    );
+  }
+
+  static List<List<bool>> _parseCompletedSets(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((exerciseSets) {
+        if (exerciseSets is List) {
+          return exerciseSets.map((set) => set == true).toList();
+        }
+        return <bool>[];
+      }).toList();
+    }
+    return [];
+  }
+
+  static List<List<WorkoutSet>> _parseModifiedSets(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((exerciseSets) {
+        if (exerciseSets is List) {
+          return exerciseSets.map((set) {
+            if (set is Map<String, dynamic>) {
+              return WorkoutSet.fromJson(set);
+            }
+            return const WorkoutSet(reps: 0, weight: 0.0);
+          }).toList();
+        }
+        return <WorkoutSet>[];
+      }).toList();
+    }
+    return [];
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is WorkoutProgress &&
+        other.currentExerciseIndex == currentExerciseIndex &&
+        other.currentSetIndex == currentSetIndex;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(currentExerciseIndex, currentSetIndex);
+  }
+
+  @override
+  String toString() {
+    return 'WorkoutProgress(exercise: $currentExerciseIndex, set: $currentSetIndex, lastSaved: $lastSavedAt)';
+  }
+}
+
 /// Workout template model representing a planned workout routine
 ///
 /// A workout defines a structured exercise routine with planned exercises,
