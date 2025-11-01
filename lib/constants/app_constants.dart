@@ -6,7 +6,7 @@ class AppConstants {
   // PocketBase Configuration
   static const String pocketBaseDevUrl = 'http://localhost:8090';
   static const String pocketBaseProdUrl =
-      'https://your-production-pocketbase.com';
+      'https://periopocket.sensei.stonedojo.cloud/';
 
   // API Configuration
   static const Duration apiTimeout = Duration(seconds: 30);
