@@ -16,7 +16,9 @@
     "flutter:format": "dart format .",
     "dev:setup": "npm run flutter:get && npm run pocketbase:setup",
     "dev:start": "npm run pocketbase:start",
-    "user:verify": "cd scripts && dart pub get && dart verify_user_email.dart",
+    "user:verify": "./scripts/verify-user-email.sh",
+    "user:verify:auto": "./scripts/verify-user-email-auto.sh",
+    "user:verify:win": "./scripts/verify-user-email.bat",
     "scripts:install": "cd scripts && dart pub get"
   },
   "engines": {

@@ -29,14 +29,27 @@ npm run scripts:install
 
 Marks a user's email as verified in the PocketBase users collection.
 
-**Usage:**
+**Usage Options:**
 
+1. **Auto-loading from .env file (Recommended):**
+```bash
+# From project root (automatically loads .env file)
+npm run user:verify:auto user@example.com
+```
+
+2. **Manual environment variables:**
+```bash
+# From project root
+POCKETBASE_ADMIN_EMAIL="admin@example.com" POCKETBASE_ADMIN_PASSWORD="your_password" npm run user:verify user@example.com
+
+# Windows (from project root)
+npm run user:verify:win user@example.com
+```
+
+3. **Direct script execution:**
 ```bash
 # From scripts directory
 POCKETBASE_ADMIN_EMAIL="admin@example.com" POCKETBASE_ADMIN_PASSWORD="your_password" dart verify_user_email.dart user@example.com
-
-# From project root
-POCKETBASE_ADMIN_EMAIL="admin@example.com" POCKETBASE_ADMIN_PASSWORD="your_password" npm run user:verify user@example.com
 ```
 
 **Environment Variables:**
@@ -45,10 +58,22 @@ POCKETBASE_ADMIN_EMAIL="admin@example.com" POCKETBASE_ADMIN_PASSWORD="your_passw
 - `POCKETBASE_ADMIN_PASSWORD` (required) - Admin password for PocketBase authentication  
 - `POCKETBASE_URL` (optional) - PocketBase server URL (default: http://localhost:8090)
 
+**Setup .env file (Recommended):**
+
+Copy `.env.example` to `.env` and update the admin credentials:
+
+```bash
+cp .env.example .env
+# Edit .env file with your admin credentials
+```
+
 **Example:**
 
 ```bash
-# Verify user email
+# Using auto-loading (reads from .env file)
+npm run user:verify:auto john.doe@example.com
+
+# Using manual environment variables
 export POCKETBASE_ADMIN_EMAIL="admin@periolifts.com"
 export POCKETBASE_ADMIN_PASSWORD="secure_admin_password"
 npm run user:verify john.doe@example.com
