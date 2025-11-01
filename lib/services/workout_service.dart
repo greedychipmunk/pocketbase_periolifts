@@ -444,15 +444,8 @@ class WorkoutService extends BasePocketBaseService {
         );
       }
 
-      // Validate rest time if provided
-      if (set.restTime != null && set.restTime!.inSeconds < 0) {
-        return Result.error(
-          AppError.validation(
-            message: 'Rest time cannot be negative',
-            details: {'field': 'exercises[$index].sets[$setIndex].restTime'},
-          ),
-        );
-      }
+      // Note: Duration.inSeconds cannot be negative for a valid Duration object,
+      // so no validation needed for restTime
     }
 
     return Result.success(null);

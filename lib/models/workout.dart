@@ -144,8 +144,9 @@ class WorkoutExercise {
           if (setJson is Map<String, dynamic>) {
             return WorkoutSet.fromJson(setJson);
           }
-          return const WorkoutSet(reps: 0, weight: 0.0);
-        }).toList();
+          // Skip invalid set data instead of creating invalid sets
+          return null;
+        }).whereType<WorkoutSet>().toList();
       } else if (setsData is int && setsData > 0) {
         // Legacy format: create sets based on count with default reps/weight
         final reps = json['reps'] as int? ?? 10;
@@ -313,8 +314,9 @@ class WorkoutProgress {
             if (set is Map<String, dynamic>) {
               return WorkoutSet.fromJson(set);
             }
-            return const WorkoutSet(reps: 0, weight: 0.0);
-          }).toList();
+            // Skip invalid set data
+            return null;
+          }).whereType<WorkoutSet>().toList();
         }
         return <WorkoutSet>[];
       }).toList();
