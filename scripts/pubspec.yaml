@@ -1,0 +1,16 @@
+name: periolifts_scripts
+description: Administrative scripts for PerioLifts PocketBase management
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  pocketbase: ^0.23.0
+
+dev_dependencies:
+  lints: ^5.0.0
+
+executables:
+  verify_user_email:

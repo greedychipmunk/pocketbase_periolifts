@@ -43,3 +43,19 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment variables and secrets
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# PocketBase data (if running locally)
+pocketbase/
+pb_data/
+
+# Scripts dependencies
+scripts/.dart_tool/
+scripts/.pub-cache/
+scripts/pubspec.lock

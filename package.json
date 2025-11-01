@@ -15,7 +15,9 @@
     "flutter:analyze": "flutter analyze",
     "flutter:format": "dart format .",
     "dev:setup": "npm run flutter:get && npm run pocketbase:setup",
-    "dev:start": "npm run pocketbase:start"
+    "dev:start": "npm run pocketbase:start",
+    "user:verify": "cd scripts && dart pub get && dart verify_user_email.dart",
+    "scripts:install": "cd scripts && dart pub get"
   },
   "engines": {
     "node": ">=16.0.0"
