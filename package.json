@@ -14,7 +14,7 @@
     "flutter:test": "flutter test",
     "flutter:analyze": "flutter analyze",
     "flutter:format": "dart format .",
-    "dev:setup": "npm run pocketbase:setup && npm run flutter:get",
+    "dev:setup": "npm run flutter:get && npm run pocketbase:setup",
     "dev:start": "npm run pocketbase:start"
   },
   "engines": {
