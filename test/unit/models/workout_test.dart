@@ -529,7 +529,7 @@ void main() {
           description: 'Leg day training',
           estimatedDuration: 60,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'squat_id',
               exerciseName: 'Squat',
               sets: 4,
@@ -537,7 +537,7 @@ void main() {
               weight: 100.0,
               restTime: 120,
             ),
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'deadlift_id',
               exerciseName: 'Deadlift',
               sets: 3,
@@ -598,7 +598,7 @@ void main() {
           description: 'Original description',
           estimatedDuration: 30,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex1',
               exerciseName: 'Exercise 1',
               sets: 3,
@@ -613,7 +613,7 @@ void main() {
           name: 'Updated Workout',
           estimatedDuration: 45,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex2',
               exerciseName: 'Exercise 2',
               sets: 4,
@@ -643,13 +643,13 @@ void main() {
           name: 'Test Workout',
           estimatedDuration: 30,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex1',
               exerciseName: 'Exercise 1',
               sets: 3,
               reps: 10,
             ),
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex2',
               exerciseName: 'Exercise 2',
               sets: 4,
@@ -672,13 +672,13 @@ void main() {
           name: 'Test Workout',
           estimatedDuration: 30,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex1',
               exerciseName: 'Exercise 1',
               sets: 3,
               reps: 10,
             ),
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex2',
               exerciseName: 'Exercise 2',
               sets: 2,
@@ -701,13 +701,13 @@ void main() {
           name: 'Test Workout',
           estimatedDuration: 30,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex1',
               exerciseName: 'Exercise 1',
               sets: 3,
               reps: 10,
             ),
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex2',
               exerciseName: 'Exercise 2',
               sets: 2,
@@ -736,7 +736,7 @@ void main() {
           name: 'Workout With Exercises',
           estimatedDuration: 30,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex1',
               exerciseName: 'Exercise 1',
               sets: 3,
@@ -770,7 +770,7 @@ void main() {
           name: 'Valid Workout',
           estimatedDuration: 30,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'valid_exercise_id',
               exerciseName: 'Valid Exercise',
               sets: 3,
@@ -844,13 +844,13 @@ void main() {
           name: 'Test Workout',
           estimatedDuration: 45,
           exercises: const [
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex1',
               exerciseName: 'Exercise 1',
               sets: 3,
               reps: 10,
             ),
-            WorkoutExercise(
+            WorkoutExercise.uniform(
               exerciseId: 'ex2',
               exerciseName: 'Exercise 2',
               sets: 2,
@@ -896,11 +896,11 @@ void main() {
         // Arrange
         final manyExercises = List.generate(
           100,
-          (index) => WorkoutExercise(
-            exerciseId: 'exercise_$index',
-            exerciseName: 'Exercise $index',
-            sets: 3,
-            reps: 10,
+          (index) => WorkoutExercise.uniform(
+              exerciseId: 'exercise_$index',
+              exerciseName: 'Exercise $index',
+              sets: 3,
+              reps: 10,
           ),
         );
 
