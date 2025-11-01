@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/login_screen.dart';
+import 'screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
+import 'providers/workout_providers.dart';
+import 'providers/workout_session_providers.dart';
 import 'config/theme_config.dart';
 import 'constants/app_constants.dart';
 
@@ -23,51 +26,37 @@ class PerioLiftsApp extends ConsumerWidget {
       theme: LightThemeConfig.themeData(),
       darkTheme: DarkThemeConfig.themeData(),
       themeMode: ThemeMode.system,
-      home: _buildHomeScreen(authState),
+      home: _buildHomeScreen(authState, ref),
     );
   }
 
-  Widget _buildHomeScreen(AuthState authState) {
+  Widget _buildHomeScreen(AuthState authState, WidgetRef ref) {
     // Show loading while checking authentication
     if (authState.isLoading && authState.user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Show temporary welcome screen if authenticated
+    // Show DashboardScreen if authenticated
     if (authState.user != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Welcome'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                // TODO: Get ref here to sign out
-                // ref.read(authProvider.notifier).signOut();
-              },
-            ),
-          ],
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Welcome, ${authState.user?.name ?? 'User'}!',
-                style: const TextStyle(fontSize: 24),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Dashboard coming soon...',
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-        ),
+      // Use service providers instead of creating new instances
+      final workoutService = ref.read(workoutServiceProvider);
+      final workoutSessionService = ref.read(workoutSessionServiceProvider);
+      final authService = ref.read(authServiceProvider);
+
+      return DashboardScreen(
+        workoutService: workoutService,
+        workoutSessionService: workoutSessionService,
+        authService: authService,
+        onAuthError: () => _handleSignOut(ref),
+        onLogout: () => _handleSignOut(ref),
       );
     }
 
     // Show login screen if not authenticated
     return const LoginScreen();
+  }
+
+  Future<void> _handleSignOut(WidgetRef ref) async {
+    await ref.read(authProvider.notifier).signOut();
   }
 }

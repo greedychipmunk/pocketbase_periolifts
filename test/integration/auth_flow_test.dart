@@ -29,7 +29,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange - This will fail because main app doesn't exist yet
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Should start on login screen or splash screen
@@ -69,7 +69,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Navigate to sign up screen
@@ -89,7 +89,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Navigate to sign up screen
@@ -118,7 +118,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange - Start with existing user
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Should be on login screen
@@ -144,7 +144,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Act: Fill login form with invalid credentials - This will fail because error handling doesn't exist
@@ -172,7 +172,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Act: Enter invalid email format - This will fail because validation doesn't exist
@@ -195,7 +195,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange: First complete sign in
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         const testEmail = 'test@example.com';
@@ -211,7 +211,7 @@ void main() {
         expect(find.byType(DashboardScreen), findsOneWidget);
 
         // Act: Simulate app restart - This will fail because session restoration doesn't exist
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Assert: Should automatically be logged in
@@ -222,7 +222,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange: Start with expired session
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Act: Try to access protected content - This will fail because session handling doesn't exist
@@ -239,7 +239,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange: First sign in
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         const testEmail = 'test@example.com';
@@ -262,7 +262,7 @@ void main() {
         expect(find.byType(LoginScreen), findsOneWidget);
 
         // Verify session is cleared by trying to restart app
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         expect(find.byType(LoginScreen), findsOneWidget);
@@ -274,7 +274,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Start on login screen
@@ -321,7 +321,7 @@ void main() {
         'should complete auth flow within constitutional performance limits',
         (WidgetTester tester) async {
           // Arrange
-          await tester.pumpWidget(const MyApp());
+          await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
           await tester.pumpAndSettle();
 
           // Act & Assert: Complete sign in within time limits
@@ -346,7 +346,7 @@ void main() {
         'should handle rapid authentication attempts without performance degradation',
         (WidgetTester tester) async {
           // Arrange
-          await tester.pumpWidget(const MyApp());
+          await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
           await tester.pumpAndSettle();
 
           // Act: Perform multiple rapid authentication attempts
@@ -380,7 +380,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange - Simulate network disconnect
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Act: Try to sign in without network - This will fail because offline handling doesn't exist
@@ -402,7 +402,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange: Start with network error state
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Show network error
@@ -432,7 +432,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Act: Navigate using only keyboard - This will fail because keyboard nav doesn't exist
@@ -460,7 +460,7 @@ void main() {
         WidgetTester tester,
       ) async {
         // Arrange
-        await tester.pumpWidget(const MyApp());
+        await tester.pumpWidget(const ProviderScope(child: PerioLiftsApp()));
         await tester.pumpAndSettle();
 
         // Act: Trigger authentication error - This will fail because announcements don't exist
