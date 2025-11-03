@@ -52,10 +52,7 @@ class _BaseLayoutState extends State<BaseLayout> {
         // Always use DashboardScreen for Home
         // Create WorkoutSessionService if not provided
         final sessionService = widget.workoutSessionService ??
-            WorkoutSessionService(
-              databases: widget.workoutService.databases,
-              client: widget.authService.client,
-            );
+            WorkoutSessionService();
         targetScreen = DashboardScreen(
           workoutService: widget.workoutService,
           workoutSessionService: sessionService,
