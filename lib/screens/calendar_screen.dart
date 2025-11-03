@@ -46,19 +46,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final startDate = DateTime(now.year, now.month - 6, 1);
       final endDate = DateTime(now.year, now.month + 1, 31);
       
-      final workouts = await widget.workoutService.getWorkouts(
-        startDate: startDate,
-        endDate: endDate,
-      );
+      final workoutsResult = await widget.workoutService.getWorkouts();
+      
+      if (workoutsResult.isError) {
+        throw Exception('Failed to load workouts: ${workoutsResult.error}');
+      }
+      
+      final allWorkouts = workoutsResult.data!;
+      
+      // Filter workouts by date range locally
+      final workouts = allWorkouts.where((workout) {
+        final workoutDate = workout.completedDate ?? workout.scheduledDate;
+        if (workoutDate == null) return false;
+        return workoutDate.isAfter(startDate.subtract(const Duration(days: 1))) &&
+               workoutDate.isBefore(endDate.add(const Duration(days: 1)));
+      }).toList();
 
       // Group workouts by date
       final Map<DateTime, List<Workout>> workoutsByDate = {};
       
       for (final workout in workouts) {
+        final scheduledDate = workout.scheduledDate ?? DateTime.now();
         final dateKey = DateTime(
-          workout.scheduledDate.year,
-          workout.scheduledDate.month,
-          workout.scheduledDate.day,
+          scheduledDate.year,
+          scheduledDate.month,
+          scheduledDate.day,
         );
         
         if (!workoutsByDate.containsKey(dateKey)) {
@@ -141,7 +153,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       try {
         Workout actualWorkout = workout;
         if (workout.id.contains('-workout-')) {
-          actualWorkout = await widget.workoutService.createWorkout(workout);
+          final createResult = await widget.workoutService.createWorkout(workout);
+          if (createResult.isError) {
+            throw Exception('Failed to create workout: ${createResult.error}');
+          }
+          actualWorkout = createResult.data!;
         }
 
         final result = await Navigator.push(
@@ -184,7 +200,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Completed: ${_formatDate(workout.completedDate ?? workout.scheduledDate)}'),
+            Text('Completed: ${_formatDate((workout.completedDate ?? workout.scheduledDate) ?? DateTime.now())}'),
             const SizedBox(height: 12),
             Text('Exercises: ${workout.exercises.length}'),
             const SizedBox(height: 8),

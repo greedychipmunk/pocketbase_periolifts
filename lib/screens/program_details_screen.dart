@@ -61,6 +61,8 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
             // Create a placeholder workout since the schedule contains template IDs, not real workout documents
             workouts.add(Workout(
               id: workoutId,
+              created: DateTime.now(),
+              updated: DateTime.now(),
               userId: widget.program.userId,
               name: workoutName,
               description: 'Scheduled workout from ${widget.program.name}',
@@ -71,7 +73,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
         }
       }
       
-      workouts.sort((a, b) => a.scheduledDate.compareTo(b.scheduledDate));
+      workouts.sort((a, b) => (a.scheduledDate ?? DateTime.now()).compareTo(b.scheduledDate ?? DateTime.now()));
       
       if (mounted) {
         setState(() {
@@ -745,7 +747,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).primaryColor,
           child: Text(
-            workout.scheduledDate.day.toString(),
+            (workout.scheduledDate?.day ?? 1).toString(),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ),
@@ -756,7 +758,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_formatWorkoutDate(workout.scheduledDate)),
+            Text(_formatWorkoutDate(workout.scheduledDate ?? DateTime.now())),
             if (workout.exercises.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(

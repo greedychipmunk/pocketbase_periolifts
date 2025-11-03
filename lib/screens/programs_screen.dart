@@ -40,10 +40,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     });
 
     try {
-      final loadedPrograms = await widget.workoutService.getPrograms();
+      final loadedProgramsResult = await widget.workoutService.getPrograms();
       if (mounted) {
         setState(() {
-          programs = loadedPrograms;
+          if (loadedProgramsResult.isSuccess) {
+            programs = loadedProgramsResult.data!;
+          } else {
+            errorMessage = loadedProgramsResult.error?.message ?? 'Failed to load programs';
+          }
           isLoading = false;
         });
       }
@@ -70,18 +74,23 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       try {
         final program = WorkoutPlan(
           id: '',
+          created: DateTime.now(),
+          updated: DateTime.now(),
           userId: '',
           name: result['name']!,
           description: result['description']!,
-          createdAt: DateTime.now(),
           startDate: DateTime.parse(result['startDate']!),
           schedule: {},
         );
 
-        final createdProgram = await widget.workoutService.createProgram(program);
-        setState(() {
-          programs.add(createdProgram);
-        });
+        final createdProgramResult = await widget.workoutService.createProgram(program);
+        if (createdProgramResult.isSuccess) {
+          setState(() {
+            programs.add(createdProgramResult.data!);
+          });
+        } else {
+          throw Exception(createdProgramResult.error?.message ?? 'Failed to create program');
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -317,7 +326,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Created ${_formatRelativeTime(program.createdAt)}',
+                    'Created ${_formatRelativeTime(program.created)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.grey[500],
                       fontSize: 11,
