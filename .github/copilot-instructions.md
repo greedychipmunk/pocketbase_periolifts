@@ -89,10 +89,7 @@ The application is organized around **five core domains**:
 final workoutProvider = FutureProvider.autoDispose<List<Workout>>((ref) async {
   final service = ref.read(workoutServiceProvider);
   final result = await service.getWorkouts();
-  return result.when(
-    success: (data) => data,
-    error: (error) => throw error,
-  );
+  return result.getOrThrow(); // Throws AppError on failure
 });
 ```
 
@@ -148,9 +145,10 @@ class Exercise extends BasePocketBaseModel {
 ### Services
 - **All services must extend `BasePocketBaseService`** which provides:
   - `pb` instance for PocketBase access
-  - `handleError()` method for error handling
+  - `handleError()` method for error handling (legacy string-based)
   - Common pagination methods
 - Use the **Result<T> pattern** for all service methods (see `lib/utils/result.dart`)
+- Use **ErrorHandler.handlePocketBaseError()** to convert PocketBase exceptions to `AppError`
 - Never throw exceptions from service methods; wrap in `Result.error()`
 - Use descriptive error messages
 
@@ -162,8 +160,15 @@ class ExerciseService extends BasePocketBaseService {
       final records = await pb.collection('exercises').getFullList();
       final exercises = records.map((r) => Exercise.fromJson(r.toJson())).toList();
       return Result.success(exercises);
+    } on ClientException catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
     } catch (e) {
-      return Result.error(handleError(e));
+      return Result.error(
+        AppError.unknown(
+          message: 'Unexpected error fetching exercises',
+          details: {'originalError': e.toString()},
+        ),
+      );
     }
   }
 }
@@ -173,21 +178,61 @@ class ExerciseService extends BasePocketBaseService {
 
 ### Result Pattern
 - Use `Result<T>` from `lib/utils/result.dart` for all operations that can fail
-- Result has two states: `Result.success(data)` and `Result.error(message)`
-- Use `when()` method to handle both cases:
+- Result has two states: `Result.success(data)` and `Result.error(AppError)`
+- Result is a sealed class with `Success<T>` and `Error<T>` subtypes
+- Use switch expressions or methods to handle results:
   ```dart
+  // Using switch expressions (pattern matching)
   final result = await service.getWorkouts();
-  return result.when(
-    success: (workouts) => workouts,
-    error: (error) => throw Exception(error),
-  );
+  final workouts = switch (result) {
+    Success(data: final data) => data,
+    Error(error: final error) => throw error,
+  };
+  
+  // Using getOrThrow() method
+  final workouts = result.getOrThrow();
+  
+  // Using getOrDefault() method
+  final workouts = result.getOrDefault([]);
+  
+  // Using map() for transformation
+  final names = result.map((workouts) => workouts.map((w) => w.name).toList());
   ```
 
 ### Exception Handling
 - Catch specific exceptions with `on` clauses when possible
-- Use `BasePocketBaseService.handleError()` to convert PocketBase errors to user-friendly messages
+- Use **ErrorHandler.handlePocketBaseError()** from `lib/utils/error_handler.dart` to convert PocketBase `ClientException` to `AppError`
 - Never silently catch errors; always log or return error state
 - Use `rethrow` to propagate exceptions when appropriate
+
+### AppError Types
+The `AppError` class (in `lib/utils/result.dart`) provides factory methods for different error types:
+- `AppError.validation()` - For validation errors
+- `AppError.authentication()` - For authentication errors
+- `AppError.network()` - For network errors
+- `AppError.server()` - For server errors
+- `AppError.notFound()` - For resource not found errors
+- `AppError.permission()` - For permission errors
+- `AppError.unknown()` - For unexpected errors
+
+**Example Error Handling Pattern:**
+```dart
+try {
+  final result = await pb.collection('exercises').getOne(id);
+  return Result.success(Exercise.fromJson(result.toJson()));
+} on ClientException catch (e) {
+  // Use ErrorHandler to convert to AppError
+  return Result.error(ErrorHandler.handlePocketBaseError(e));
+} catch (e) {
+  // Handle unexpected errors
+  return Result.error(
+    AppError.unknown(
+      message: 'Unexpected error',
+      details: {'error': e.toString()},
+    ),
+  );
+}
+```
 
 ## Testing Requirements
 
@@ -283,15 +328,16 @@ void main() {
 /// Fetches all exercises from the database.
 ///
 /// Returns a [Result] containing the list of exercises on success,
-/// or an error message on failure.
+/// or an [AppError] on failure.
 ///
 /// Example:
 /// ```dart
 /// final result = await exerciseService.getExercises();
-/// result.when(
-///   success: (exercises) => print('Found ${exercises.length} exercises'),
-///   error: (error) => print('Error: $error'),
-/// );
+/// final exercises = switch (result) {
+///   Success(data: final data) => data,
+///   Error(error: final error) => throw error,
+/// };
+/// // Or simply: final exercises = result.getOrThrow();
 /// ```
 Future<Result<List<Exercise>>> getExercises() async { ... }
 ```
