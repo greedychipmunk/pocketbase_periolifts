@@ -44,12 +44,31 @@ class _ProgressScreenState extends State<ProgressScreen> {
       final daysBack = int.parse(_selectedTimeRange);
       final startDate = now.subtract(Duration(days: daysBack));
 
-      final workouts = await widget.workoutService.getWorkouts(
-        startDate: startDate,
-        endDate: now,
-      );
+      final workoutsResult = await widget.workoutService.getWorkouts();
       
-      final programs = await widget.workoutService.getPrograms();
+      if (workoutsResult.isError) {
+        throw Exception('Failed to load workouts: ${workoutsResult.error}');
+      }
+      
+      final allWorkouts = workoutsResult.data!;
+      
+      // Filter workouts by date range locally
+      final workouts = allWorkouts.where((workout) {
+        final workoutDate = workout.completedDate ?? workout.scheduledDate;
+        if (workoutDate == null) return false;
+        return workoutDate.isAfter(startDate.subtract(const Duration(days: 1))) &&
+               workoutDate.isBefore(now.add(const Duration(days: 1)));
+      }).toList();
+      
+      final programsResult = await widget.workoutService.getPrograms();
+      
+      final List<WorkoutPlan> programs;
+      if (programsResult.isError) {
+        print('Error loading programs: ${programsResult.error}');
+        programs = [];
+      } else {
+        programs = programsResult.data!;
+      }
 
       // Calculate exercise frequency
       final Map<String, int> exerciseCount = {};
@@ -115,7 +134,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
       
       final workoutsInWeek = _completedWorkouts.where((workout) {
         final completedDate = workout.completedDate ?? workout.scheduledDate;
-        return completedDate.isAfter(weekStart.subtract(const Duration(days: 1))) &&
+        return completedDate != null && 
+               completedDate.isAfter(weekStart.subtract(const Duration(days: 1))) &&
                completedDate.isBefore(weekEnd.add(const Duration(days: 1)));
       }).length;
       
@@ -130,14 +150,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     
     // Sort by completion date
     final sortedWorkouts = _completedWorkouts.toList()
-      ..sort((a, b) => (b.completedDate ?? b.scheduledDate)
-          .compareTo(a.completedDate ?? a.scheduledDate));
+      ..sort((a, b) => ((b.completedDate ?? b.scheduledDate) ?? DateTime.now())
+          .compareTo((a.completedDate ?? a.scheduledDate) ?? DateTime.now()));
     
     int streak = 0;
     DateTime? lastWorkoutDate;
     
     for (final workout in sortedWorkouts) {
       final workoutDate = workout.completedDate ?? workout.scheduledDate;
+      if (workoutDate == null) continue;
       final dateOnly = DateTime(workoutDate.year, workoutDate.month, workoutDate.day);
       
       if (lastWorkoutDate == null) {
@@ -477,7 +498,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ..._allPrograms.map((program) {
               // Count workouts completed for this program
               final programWorkouts = _completedWorkouts.where((workout) =>
-                  workout.description.contains(program.name) ||
+                  (workout.description?.contains(program.name) ?? false) ||
                   program.schedule.values.any((workoutIds) =>
                       workoutIds.any((id) => workout.id.contains(id.split('-').first))
                   )

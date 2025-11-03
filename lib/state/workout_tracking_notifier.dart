@@ -389,7 +389,7 @@ class WorkoutTrackingNotifier extends StateNotifier<WorkoutTrackingState> {
       } else {
         try {
           // Try to update first
-          await _workoutService.updateWorkout(workoutToSave);
+          await _workoutService.updateWorkout(workoutToSave.id, workoutToSave);
         } catch (e) {
           // If update fails because document doesn't exist, create it instead
           if (e.toString().contains('document_not_found') ||
@@ -450,7 +450,7 @@ class WorkoutTrackingNotifier extends StateNotifier<WorkoutTrackingState> {
         await _workoutService.createWorkout(completedWorkout);
       } else {
         try {
-          await _workoutService.updateWorkout(completedWorkout);
+          await _workoutService.updateWorkout(completedWorkout.id, completedWorkout);
         } catch (e) {
           // If update fails because document doesn't exist, create it instead
           if (e.toString().contains('document_not_found') ||
