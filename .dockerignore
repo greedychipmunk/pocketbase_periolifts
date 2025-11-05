@@ -45,13 +45,10 @@ pubspec.lock
 analysis_options.yaml
 .metadata
 
-# Exclude scripts
+# Exclude host development files (not needed in PocketBase container)
+# Note: These are for host machine development workflow, not Docker container
 scripts/
-
-# Exclude specs
 specs/
-
-# Exclude node modules
 node_modules/
 package.json
 package-lock.json
