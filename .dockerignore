@@ -1,0 +1,59 @@
+# Exclude version control
+.git
+.gitignore
+
+# Exclude documentation
+*.md
+docs/
+
+# Exclude test files
+test/
+
+# Exclude Flutter build artifacts
+build/
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# Exclude IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Exclude platform-specific directories
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+
+# Exclude environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Exclude Flutter/Dart files (only need pocketbase)
+lib/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+.metadata
+
+# Exclude host development files (not needed in PocketBase container)
+# Note: These are for host machine development workflow, not Docker container
+scripts/
+specs/
+node_modules/
+package.json
+package-lock.json
+
+# Exclude PocketBase binary (using Docker image instead)
+pocketbase/pocketbase
+pocketbase/CHANGELOG.md
+pocketbase/LICENSE.md

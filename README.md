@@ -56,11 +56,31 @@ PerioLifts is built using a modern, scalable architecture:
 
 ## Getting Started
 
+### Quick Start (Docker)
+
+Get started in 3 simple steps:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/greedychipmunk/pocketbase_periolifts.git
+cd pocketbase_periolifts
+
+# 2. Start PocketBase backend
+docker compose up -d
+
+# 3. Install dependencies and run the app
+flutter pub get
+flutter run
+```
+
+PocketBase will be available at http://localhost:8090
+
 ### Prerequisites
 
 - **Flutter SDK** (3.9.2 or later)
 - **Dart SDK** (3.0 or later)
-- **PocketBase** server instance
+- **Docker** and **Docker Compose** (for running PocketBase - recommended)
+  - Alternatively, you can download and run PocketBase manually
 - **Git** for version control
 
 ### Development Setup
@@ -76,7 +96,19 @@ PerioLifts is built using a modern, scalable architecture:
    flutter pub get
    ```
 
-3. **Set up PocketBase server**:
+3. **Set up PocketBase server** (using Docker Compose - recommended):
+   ```bash
+   # Start PocketBase in the background
+   docker compose up -d
+   
+   # View logs
+   docker compose logs -f pocketbase
+   
+   # Stop PocketBase
+   docker compose down
+   ```
+   
+   **Alternative**: Manual setup without Docker:
    - Download PocketBase from [pocketbase.io](https://pocketbase.io)
    - Start the server: `./pocketbase serve`
    - Configure collections using the provided schema
@@ -103,6 +135,53 @@ PerioLifts is built using a modern, scalable architecture:
 
 ### PocketBase Setup
 
+#### Using Docker Compose (Recommended)
+
+The project includes a `docker-compose.yml` file that makes it easy to run PocketBase locally.
+
+**Benefits:**
+- No need to download PocketBase binary manually
+- Automatic data persistence via Docker volumes
+- Consistent environment across all developers
+- Easy cleanup and restart
+
+**Commands:**
+```bash
+# Start PocketBase (runs in background)
+docker compose up -d
+
+# View logs
+docker compose logs -f pocketbase
+
+# Stop PocketBase (keeps data)
+docker compose down
+
+# Stop and remove data (clean restart)
+docker compose down -v
+```
+
+**Verify Installation:**
+```bash
+# Run the verification script to ensure PocketBase is working
+./verify-pocketbase.sh
+```
+
+**Access PocketBase:**
+- Admin UI: http://localhost:8090/_/
+- API: http://localhost:8090/api/
+
+**Data Persistence:**
+The PocketBase database and files are stored in `./pocketbase/pb_data/` and are persisted across container restarts.
+
+#### Manual Setup (Alternative)
+
+If you prefer not to use Docker, you can run PocketBase manually:
+1. Download PocketBase from [pocketbase.io](https://pocketbase.io)
+2. Extract and run: `./pocketbase serve`
+3. Access the admin UI at http://localhost:8090/_/
+
+#### Required Collections
+
 The application requires several PocketBase collections:
 
 - `users` - User authentication and profiles
@@ -114,6 +193,41 @@ The application requires several PocketBase collections:
 
 > [!NOTE]
 > Collection schemas and sample data will be provided in future releases.
+
+### Troubleshooting
+
+#### Docker Compose Issues
+
+**Container won't start:**
+```bash
+# Check container logs
+docker compose logs pocketbase
+
+# Remove container and restart
+docker compose down
+docker compose up -d
+```
+
+**Port 8090 already in use:**
+```bash
+# Check what's using port 8090
+lsof -i :8090  # On macOS/Linux
+netstat -ano | findstr :8090  # On Windows
+
+# Stop the conflicting process or modify docker-compose.yml to use a different port
+```
+
+**Permission denied accessing pb_data:**
+```bash
+# Ensure the pb_data directory has correct permissions
+chmod -R 755 pocketbase/pb_data/
+```
+
+**Cannot connect to PocketBase from Flutter app:**
+- Ensure Docker container is running: `docker compose ps`
+- Check container health: `docker compose ps` (should show "healthy")
+- Verify API is accessible: `curl http://localhost:8090/api/health`
+- Check your `.env` file has correct `POCKETBASE_URL=http://localhost:8090`
 
 ## Project Structure
 
