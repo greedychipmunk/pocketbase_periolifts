@@ -160,6 +160,12 @@ docker compose down
 docker compose down -v
 ```
 
+**Verify Installation:**
+```bash
+# Run the verification script to ensure PocketBase is working
+./verify-pocketbase.sh
+```
+
 **Access PocketBase:**
 - Admin UI: http://localhost:8090/_/
 - API: http://localhost:8090/api/
