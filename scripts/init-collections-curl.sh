@@ -43,63 +43,45 @@ wait_for_pocketbase() {
     return 1
 }
 
-# Function to create admin user if it doesn't exist
-create_admin_user() {
-    echo "👤 Creating admin user via API..."
+# Function to check if superuser exists
+check_superuser_exists() {
+    echo "👤 Checking if superuser exists..."
     
-    local create_response
-    create_response=$(curl -s -X POST "${BASE_URL}/api/admins" \
+    # Try to authenticate - if successful, superuser exists
+    local auth_response
+    auth_response=$(curl -s -X POST "${BASE_URL}/api/collections/_superusers/auth-with-password" \
         -H "Content-Type: application/json" \
-        -d "{\"email\":\"$POCKETBASE_ADMIN_EMAIL\",\"password\":\"$POCKETBASE_ADMIN_PASSWORD\",\"passwordConfirm\":\"$POCKETBASE_ADMIN_PASSWORD\"}" \
+        -d "{\"identity\":\"$POCKETBASE_ADMIN_EMAIL\",\"password\":\"$POCKETBASE_ADMIN_PASSWORD\"}" \
         2>/dev/null)
     
-    echo "Debug: Create admin API response: $create_response" >&2
-    
-    if echo "$create_response" | grep -q '"id"'; then
-        echo "✅ Admin user created via API"
+    if echo "$auth_response" | grep -q '"token"'; then
+        echo "✅ Superuser exists and credentials are correct"
         return 0
     else
-        # Check if it's just that the user already exists
-        if echo "$create_response" | grep -q "email already exists" || echo "$create_response" | grep -q "already exists"; then
-            echo "ℹ️  Admin user already exists via API"
-            return 0
-        else
-            echo "⚠️  API admin creation failed: $create_response" >&2
-            echo "ℹ️  Admin may have been created by setup container"
-            return 0
-        fi
+        echo "⚠️  Superuser check failed"
+        echo "Debug: Auth response: $auth_response" >&2
+        return 1
     fi
 }
 
 # Function to authenticate as admin
 authenticate_admin() {
-    echo "🔐 Authenticating as admin..." >&2
+    echo "🔐 Authenticating as superuser..." >&2
     
-    # Try different authentication endpoints based on PocketBase version/setup
+    # In PocketBase v0.23.0+, admins are _superusers auth collection records
     local auth_response
-    local endpoint
+    local endpoint="/api/collections/_superusers/auth-with-password"
     
-    # List of endpoints to try (POSIX shell compatible)
-    for endpoint in \
-        "/api/collections/users/auth-with-password" \
-        "/api/collections/_superusers/auth-with-password" \
-        "/api/admins/auth-with-password"; do
-        
-        echo "🔄 Trying endpoint: $endpoint" >&2
-        auth_response=$(curl -s -X POST "${BASE_URL}${endpoint}" \
-            -H "Content-Type: application/json" \
-            -d "{\"identity\":\"$POCKETBASE_ADMIN_EMAIL\",\"password\":\"$POCKETBASE_ADMIN_PASSWORD\"}" \
-            2>/dev/null)
-        
-        echo "Debug: Response from $endpoint: $auth_response" >&2
-        
-        if echo "$auth_response" | grep -q "token"; then
-            echo "✅ Authentication successful with $endpoint" >&2
-            break
-        fi
-    done
+    echo "🔄 Using endpoint: $endpoint" >&2
+    auth_response=$(curl -s -X POST "${BASE_URL}${endpoint}" \
+        -H "Content-Type: application/json" \
+        -d "{\"identity\":\"$POCKETBASE_ADMIN_EMAIL\",\"password\":\"$POCKETBASE_ADMIN_PASSWORD\"}" \
+        2>/dev/null)
     
-    if echo "$auth_response" | grep -q "token"; then
+    echo "Debug: Response from $endpoint: $auth_response" >&2
+    
+    if echo "$auth_response" | grep -q '"token"'; then
+        echo "✅ Authentication successful" >&2
         # Extract token more reliably using multiple methods
         token=$(echo "$auth_response" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
         if [ -z "$token" ]; then
@@ -109,7 +91,7 @@ authenticate_admin() {
         echo "Debug: Extracted token: '$token'" >&2
         echo "$token"
     else
-        echo "Debug: No token found in any response" >&2
+        echo "Debug: No token found in response" >&2
         echo ""
     fi
 }
@@ -318,30 +300,37 @@ main() {
         exit 1
     fi
 
-    # Try to create admin user via API if needed
-    create_admin_user
-    
-    # Wait a bit for superuser to be available for authentication
-    echo "⏳ Waiting for superuser to be available for authentication..."
-    sleep 3
-    
-    # Authenticate as admin (user should exist either from setup container or API)
-    local auth_token
-    auth_token=$(authenticate_admin)
-    
-    if [ -z "$auth_token" ] || [ "$auth_token" = "🔐 Authenticating ..." ]; then
-        echo "❌ Admin authentication failed"
-        echo "This might be because:"
-        echo "  1. PocketBase is in setup mode (visit http://localhost:8090/_ to set up)"
-        echo "  2. Admin credentials in .env are incorrect" 
-        echo "  3. PocketBase database is corrupted"
-        echo "  4. Superuser creation failed or needs more time"
+    # Check if superuser exists with provided credentials
+    if ! check_superuser_exists; then
         echo ""
-        echo "Debug: Actual auth token received: '$auth_token'"
+        echo "❌ Superuser authentication failed"
+        echo ""
+        echo "PocketBase v0.23.0+ requires manual superuser setup."
+        echo ""
+        echo "📋 Setup Instructions:"
+        echo "  1. Visit http://localhost:${POCKETBASE_PORT}/_/ in your browser"
+        echo "  2. Create a superuser account (this is a one-time setup)"
+        echo "  3. Update your .env file with the superuser credentials:"
+        echo "     POCKETBASE_ADMIN_EMAIL=your-superuser-email"
+        echo "     POCKETBASE_ADMIN_PASSWORD=your-superuser-password"
+        echo "  4. Restart the containers: docker compose down && docker compose up"
+        echo ""
+        echo "Note: In PocketBase v0.23.0+, admins are now called 'superusers'"
+        echo "      and must be created through the web UI on first run."
         exit 1
     fi
     
-    echo "✅ Admin authentication successful"
+    # Authenticate as admin
+    local auth_token
+    auth_token=$(authenticate_admin)
+    
+    if [ -z "$auth_token" ]; then
+        echo "❌ Superuser authentication failed during token extraction"
+        echo "Please check your credentials in the .env file"
+        exit 1
+    fi
+    
+    echo "✅ Superuser authentication successful"
     echo "Debug: Token length: ${#auth_token}" >&2
     echo "Debug: Token preview: ${auth_token:0:20}..." >&2
 
@@ -350,7 +339,7 @@ main() {
     local existing_collections
     existing_collections=$(get_existing_collections "$auth_token")
     
-    echo "📋 Existing collections: $(echo $existing_collections | tr '\n' ' ')"
+    echo "📋 Existing collections: $(echo "$existing_collections" | tr '\n' ' ')"
 
     # Create missing collections
     local created=0
