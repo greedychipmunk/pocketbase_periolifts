@@ -58,17 +58,27 @@ PerioLifts is built using a modern, scalable architecture:
 
 ### Quick Start (Docker)
 
-Get started in 3 simple steps:
+Get started in 4 simple steps:
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/greedychipmunk/pocketbase_periolifts.git
 cd pocketbase_periolifts
 
-# 2. Start PocketBase backend (collections created automatically)
+# 2. Copy .env.example to .env
+cp .env.example .env
+
+# 3. Start PocketBase backend
 docker compose up -d
 
-# 3. Install dependencies and run the app
+# 4. Complete initial setup
+# Visit http://localhost:8090/_/ to create your superuser account (first-time only)
+# Then update .env with your superuser credentials:
+#   POCKETBASE_ADMIN_EMAIL=your-email@example.com
+#   POCKETBASE_ADMIN_PASSWORD=your-secure-password
+# Restart containers: docker compose restart pocketbase-init
+
+# 5. Install dependencies and run the app
 flutter pub get
 flutter run
 ```
@@ -77,7 +87,7 @@ PocketBase will be available at http://localhost:8090
 
 **What happens automatically:**
 - ✅ PocketBase server starts
-- ✅ Database collections are created automatically (using Dart SDK)
+- ✅ Database collections are created automatically (after superuser setup)
 - ✅ Proper security rules are configured
 - ✅ Ready for the Flutter app to connect
 
@@ -151,6 +161,36 @@ The project includes a `docker-compose.yml` file that makes it easy to run Pocke
 - Consistent environment across all developers
 - Easy cleanup and restart
 
+**Initial Setup (PocketBase v0.23.0+):**
+
+PocketBase v0.23.0 requires a one-time superuser creation through the web UI:
+
+1. Start PocketBase:
+   ```bash
+   docker compose up -d
+   ```
+
+2. Visit http://localhost:8090/_/ in your browser
+
+3. Create a superuser account (this is your admin account)
+
+4. Update your `.env` file with the superuser credentials:
+   ```bash
+   POCKETBASE_ADMIN_EMAIL=your-superuser-email@example.com
+   POCKETBASE_ADMIN_PASSWORD=your-secure-password
+   ```
+
+5. Restart the initialization container to create collections:
+   ```bash
+   docker compose restart pocketbase-init
+   ```
+
+6. Verify collections were created:
+   ```bash
+   docker compose logs pocketbase-init
+   # You should see: "Collection initialization complete!"
+   ```
+
 **Commands:**
 ```bash
 # Start PocketBase (runs in background)
@@ -198,9 +238,41 @@ The application requires several PocketBase collections:
 - `workout_history` - Historical workout data
 
 > [!NOTE]
-> Collection schemas and sample data will be provided in future releases.
+> Collections are automatically created by the `pocketbase-init` container after you complete the initial superuser setup.
+> The collection schemas are defined in `/scripts/init-collections-curl.sh`.
 
 ### Troubleshooting
+
+#### PocketBase v0.23.0 Authentication Issues
+
+**Error: "The request requires valid record authorization token" (401)**
+
+This error occurs when the initialization script cannot authenticate. This is typically because:
+
+1. **Superuser not created yet**: Visit http://localhost:8090/_/ to create your superuser account
+2. **Wrong credentials in .env**: Ensure `POCKETBASE_ADMIN_EMAIL` and `POCKETBASE_ADMIN_PASSWORD` match your superuser account
+3. **Case sensitivity**: Email addresses are case-sensitive in PocketBase
+
+**Solution:**
+```bash
+# 1. Stop containers
+docker compose down
+
+# 2. Visit http://localhost:8090/_/ and create superuser (if not done)
+docker compose up -d pocketbase
+# Open browser to http://localhost:8090/_/
+
+# 3. Update .env with correct credentials
+nano .env  # or use your preferred editor
+
+# 4. Restart initialization
+docker compose up pocketbase-init
+
+# 5. Check logs
+docker compose logs pocketbase-init
+```
+
+**Note:** In PocketBase v0.23.0+, the admin API endpoints were removed. Admins are now `_superusers` auth collection records and must be created through the web UI.
 
 #### Docker Compose Issues
 
