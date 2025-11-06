@@ -7,6 +7,16 @@
 
 set -e
 
+# Enable debug mode by setting DEBUG=1 environment variable
+DEBUG=${DEBUG:-0}
+
+# Debug logging function
+debug_log() {
+    if [ "$DEBUG" = "1" ]; then
+        echo "Debug: $*" >&2
+    fi
+}
+
 echo "🚀 Starting PocketBase collection initialization..."
 
 # Set default values if environment variables are not set
@@ -59,7 +69,7 @@ check_superuser_exists() {
         return 0
     else
         echo "⚠️  Superuser check failed"
-        echo "Debug: Auth response: $auth_response" >&2
+        debug_log "Auth response: $auth_response"
         return 1
     fi
 }
@@ -72,13 +82,13 @@ authenticate_admin() {
     local auth_response
     local endpoint="/api/collections/_superusers/auth-with-password"
     
-    echo "🔄 Using endpoint: $endpoint" >&2
+    debug_log "Using endpoint: $endpoint"
     auth_response=$(curl -s -X POST "${BASE_URL}${endpoint}" \
         -H "Content-Type: application/json" \
         -d "{\"identity\":\"$POCKETBASE_ADMIN_EMAIL\",\"password\":\"$POCKETBASE_ADMIN_PASSWORD\"}" \
         2>/dev/null)
     
-    echo "Debug: Response from $endpoint: $auth_response" >&2
+    debug_log "Response from $endpoint: $auth_response"
     
     if echo "$auth_response" | grep -q '"token"'; then
         echo "✅ Authentication successful" >&2
@@ -88,10 +98,10 @@ authenticate_admin() {
             # Fallback method using grep and cut
             token=$(echo "$auth_response" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
         fi
-        echo "Debug: Extracted token: '$token'" >&2
+        debug_log "Extracted token: '${token:0:20}...'"
         echo "$token"
     else
-        echo "Debug: No token found in response" >&2
+        debug_log "No token found in response"
         echo ""
     fi
 }
@@ -115,12 +125,12 @@ get_collection_id() {
         -H "Authorization: Bearer $token" \
         2>/dev/null)
     
-    # Extract the ID for the specified collection name
-    # This looks for the pattern: {"id":"<id>","name":"<collection_name>"
-    echo "$response" | grep -o "\"id\":\"[^\"]*\",\"[^\"]*\":\"[^\"]*\",\"name\":\"$collection_name\"" | grep -o "\"id\":\"[^\"]*\"" | cut -d'"' -f4 | head -1
-    
-    # Alternative extraction method if the above doesn't work
-    if [ -z "$(echo "$response" | grep -o "\"id\":\"[^\"]*\",\"[^\"]*\":\"[^\"]*\",\"name\":\"$collection_name\"" | grep -o "\"id\":\"[^\"]*\"" | cut -d'"' -f4 | head -1)" ]; then
+    # Try using jq first if available (most reliable)
+    if command -v jq >/dev/null 2>&1; then
+        echo "$response" | jq -r ".items[] | select(.name == \"$collection_name\") | .id" 2>/dev/null | head -1
+    else
+        # Fallback to grep/sed parsing (works without jq)
+        # Extract the ID for the collection with matching name
         echo "$response" | grep -o "{[^}]*\"name\":\"$collection_name\"[^}]*}" | grep -o "\"id\":\"[^\"]*\"" | cut -d'"' -f4 | head -1
     fi
 }
@@ -132,7 +142,7 @@ create_collection() {
     local collection_name="$3"
     
     echo "📄 Creating collection: $collection_name"
-    echo "Debug: Using token: ${token:0:20}..." >&2
+    debug_log "Using token: ${token:0:20}..."
     
     local response
     response=$(curl -s -X POST "${BASE_URL}/api/collections" \
@@ -358,8 +368,8 @@ main() {
     fi
     
     echo "✅ Superuser authentication successful"
-    echo "Debug: Token length: ${#auth_token}" >&2
-    echo "Debug: Token preview: ${auth_token:0:20}..." >&2
+    debug_log "Token length: ${#auth_token}"
+    debug_log "Token preview: ${auth_token:0:20}..."
 
     # Get existing collections
     echo "📋 Checking existing collections..."
@@ -386,7 +396,7 @@ main() {
         skipped=$((skipped + 1))
         # Get existing users collection ID
         users_id=$(get_collection_id "$auth_token" "users")
-        echo "Debug: users collection ID: $users_id" >&2
+        debug_log "users collection ID: $users_id"
     else
         local collection_data="$(create_users_collection)"
         if create_collection "$auth_token" "$collection_data" "users"; then
@@ -394,7 +404,7 @@ main() {
             sleep 1
             # Fetch the newly created collection ID
             users_id=$(get_collection_id "$auth_token" "users")
-            echo "Debug: Created users collection with ID: $users_id" >&2
+            debug_log "Created users collection with ID: $users_id"
         fi
     fi
     

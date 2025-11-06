@@ -143,7 +143,26 @@ To validate the fix resolved the original error:
 
 ## Debugging
 
-Enable debug output by checking the script logs:
+Enable debug output by setting the DEBUG environment variable:
+
+```bash
+DEBUG=1 docker compose up
+```
+
+Or for manual testing:
+
+```bash
+export DEBUG=1
+./scripts/init-collections-curl.sh
+```
+
+Debug output includes:
+- API endpoint usage
+- Authentication responses
+- Collection ID fetching
+- Token information (first 20 characters only)
+
+Check the script logs:
 
 ```bash
 docker compose logs pocketbase-init
