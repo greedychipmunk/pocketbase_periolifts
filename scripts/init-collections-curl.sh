@@ -339,7 +339,7 @@ main() {
     local existing_collections
     existing_collections=$(get_existing_collections "$auth_token")
     
-    echo "📋 Existing collections: $(echo $existing_collections | tr '\n' ' ')"
+    echo "📋 Existing collections: $(echo "$existing_collections" | tr '\n' ' ')"
 
     # Create missing collections
     local created=0
