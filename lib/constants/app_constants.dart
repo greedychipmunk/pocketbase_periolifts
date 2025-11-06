@@ -4,7 +4,19 @@ class AppConstants {
   static const String tagline = 'Track your period-optimized workouts';
 
   // PocketBase Configuration
-  static const String pocketBaseDevUrl = 'http://localhost:8090';
+  static const String _defaultPort = '8090';
+  static const String _defaultHost = 'localhost';
+  
+  /// Get the PocketBase port from environment variable or use default
+  static String get pocketBasePort =>
+      const String.fromEnvironment('POCKETBASE_PORT', defaultValue: _defaultPort);
+  
+  /// Get the PocketBase host from environment variable or use default  
+  static String get pocketBaseHost =>
+      const String.fromEnvironment('POCKETBASE_HOST', defaultValue: _defaultHost);
+  
+  static String get pocketBaseDevUrl => 
+      'http://$pocketBaseHost:$pocketBasePort';
   static const String pocketBaseProdUrl =
       'https://periopocket.sensei.stonedojo.cloud/';
 
