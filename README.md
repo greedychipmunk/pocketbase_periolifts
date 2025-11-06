@@ -65,7 +65,7 @@ Get started in 3 simple steps:
 git clone https://github.com/greedychipmunk/pocketbase_periolifts.git
 cd pocketbase_periolifts
 
-# 2. Start PocketBase backend
+# 2. Start PocketBase backend (collections created automatically)
 docker compose up -d
 
 # 3. Install dependencies and run the app
@@ -74,6 +74,12 @@ flutter run
 ```
 
 PocketBase will be available at http://localhost:8090
+
+**What happens automatically:**
+- ✅ PocketBase server starts
+- ✅ Database collections are created automatically (using Dart SDK)
+- ✅ Proper security rules are configured
+- ✅ Ready for the Flutter app to connect
 
 ### Prerequisites
 
