@@ -127,10 +127,11 @@ get_collection_id() {
     
     # Try using jq first if available (most reliable)
     if command -v jq >/dev/null 2>&1; then
-        echo "$response" | jq -r ".items[] | select(.name == \"$collection_name\") | .id" 2>/dev/null | head -1
+        echo "$response" | jq -r ".items[] | select(.name == \"$collection_name\") | .id" 2>/dev/null
     else
-        # Fallback to grep/sed parsing (works without jq)
-        # Extract the ID for the collection with matching name
+        # Fallback to grep/sed parsing
+        # Note: Assumes flat JSON structure without nested objects in collection items
+        # If PocketBase API changes significantly, consider installing jq
         echo "$response" | grep -o "{[^}]*\"name\":\"$collection_name\"[^}]*}" | grep -o "\"id\":\"[^\"]*\"" | cut -d'"' -f4 | head -1
     fi
 }
@@ -411,6 +412,16 @@ main() {
     # Verify we have users_id before proceeding
     if [ -z "$users_id" ]; then
         echo "❌ Failed to get users collection ID. Cannot create dependent collections."
+        echo ""
+        echo "Possible causes:"
+        echo "  - Users collection was not created successfully"
+        echo "  - API response format changed"
+        echo "  - Network or authentication issues"
+        echo ""
+        echo "Debugging steps:"
+        echo "  1. Enable debug mode: DEBUG=1 $0"
+        echo "  2. Check PocketBase logs: docker compose logs pocketbase"
+        echo "  3. Verify API access: curl http://\${POCKETBASE_HOST}:\${POCKETBASE_PORT}/api/collections"
         exit 1
     fi
     
@@ -445,6 +456,14 @@ main() {
     # Verify we have workouts_id before creating workout_sessions
     if [ -z "$workouts_id" ]; then
         echo "❌ Failed to get workouts collection ID. Cannot create workout_sessions."
+        echo ""
+        echo "Possible causes:"
+        echo "  - Workouts collection was not created successfully"
+        echo "  - API response format changed"
+        echo ""
+        echo "Debugging steps:"
+        echo "  1. Enable debug mode: DEBUG=1 $0"
+        echo "  2. Check if workouts collection exists in PocketBase admin UI"
         exit 1
     fi
     
@@ -479,6 +498,14 @@ main() {
     # Verify we have workout_sessions_id before creating workout_history
     if [ -z "$workout_sessions_id" ]; then
         echo "❌ Failed to get workout_sessions collection ID. Cannot create workout_history."
+        echo ""
+        echo "Possible causes:"
+        echo "  - Workout_sessions collection was not created successfully"
+        echo "  - API response format changed"
+        echo ""
+        echo "Debugging steps:"
+        echo "  1. Enable debug mode: DEBUG=1 $0"
+        echo "  2. Check if workout_sessions collection exists in PocketBase admin UI"
         exit 1
     fi
     
