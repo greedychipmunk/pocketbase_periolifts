@@ -161,8 +161,36 @@ create_collection() {
     fi
 }
 
+# Function to update collection rules
+update_collection_rules() {
+    local token="$1"
+    local collection_id="$2"
+    local rules_data="$3"
+    local collection_name="$4"
+    
+    echo "🔧 Updating rules for collection: $collection_name"
+    debug_log "Collection ID: $collection_id"
+    debug_log "Using token: ${token:0:20}..."
+    
+    local response
+    response=$(curl -s -X PATCH "${BASE_URL}/api/collections/${collection_id}" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $token" \
+        -d "$rules_data" \
+        2>/dev/null)
+    
+    if echo "$response" | grep -q '"id"'; then
+        echo "✅ Rules for '$collection_name' updated successfully"
+        return 0
+    else
+        echo "❌ Failed to update rules for '$collection_name': $response"
+        return 1
+    fi
+}
+
 # Collection definitions (JSON format)
-create_users_collection() {
+# Schema only - without rules
+create_users_collection_schema() {
     cat << 'EOF'
 {
   "name": "users",
@@ -190,7 +218,15 @@ create_users_collection() {
     {"name": "role", "type": "select", "options": {"values": ["user", "admin"]}, "required": false},
     {"name": "is_active", "type": "bool", "required": false},
     {"name": "last_active_at", "type": "date", "required": false}
-  ],
+  ]
+}
+EOF
+}
+
+# Rules only
+create_users_collection_rules() {
+    cat << 'EOF'
+{
   "listRule": "id = @request.auth.id",
   "viewRule": "id = @request.auth.id",
   "createRule": "",
@@ -200,7 +236,7 @@ create_users_collection() {
 EOF
 }
 
-create_exercises_collection() {
+create_exercises_collection_schema() {
     local users_id="$1"
     cat << EOF
 {
@@ -215,7 +251,14 @@ create_exercises_collection() {
     {"name": "video_url", "type": "url", "required": false},
     {"name": "is_custom", "type": "bool", "required": true},
     {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": false}
-  ],
+  ]
+}
+EOF
+}
+
+create_exercises_collection_rules() {
+    cat << 'EOF'
+{
   "listRule": "is_custom = false || user_id = @request.auth.id",
   "viewRule": "is_custom = false || user_id = @request.auth.id",
   "createRule": "@request.auth.id != \"\"",
@@ -225,7 +268,7 @@ create_exercises_collection() {
 EOF
 }
 
-create_workouts_collection() {
+create_workouts_collection_schema() {
     local users_id="$1"
     cat << EOF
 {
@@ -242,7 +285,14 @@ create_workouts_collection() {
     {"name": "completed_date", "type": "date", "required": false},
     {"name": "is_in_progress", "type": "bool", "required": false},
     {"name": "progress", "type": "json", "required": false}
-  ],
+  ]
+}
+EOF
+}
+
+create_workouts_collection_rules() {
+    cat << 'EOF'
+{
   "listRule": "user_id = @request.auth.id",
   "viewRule": "user_id = @request.auth.id",
   "createRule": "@request.auth.id != \"\"",
@@ -252,7 +302,7 @@ create_workouts_collection() {
 EOF
 }
 
-create_workout_plans_collection() {
+create_workout_plans_collection_schema() {
     local users_id="$1"
     cat << EOF
 {
@@ -265,7 +315,14 @@ create_workout_plans_collection() {
     {"name": "schedule", "type": "json", "required": true},
     {"name": "is_active", "type": "bool", "required": false},
     {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": true}
-  ],
+  ]
+}
+EOF
+}
+
+create_workout_plans_collection_rules() {
+    cat << 'EOF'
+{
   "listRule": "user_id = @request.auth.id",
   "viewRule": "user_id = @request.auth.id",
   "createRule": "@request.auth.id != \"\"",
@@ -275,7 +332,7 @@ create_workout_plans_collection() {
 EOF
 }
 
-create_workout_sessions_collection() {
+create_workout_sessions_collection_schema() {
     local workouts_id="$1"
     local users_id="$2"
     cat << EOF
@@ -292,7 +349,14 @@ create_workout_sessions_collection() {
     {"name": "exercise_data", "type": "json", "required": true},
     {"name": "total_duration", "type": "number", "required": false},
     {"name": "calories_burned", "type": "number", "required": false}
-  ],
+  ]
+}
+EOF
+}
+
+create_workout_sessions_collection_rules() {
+    cat << 'EOF'
+{
   "listRule": "user_id = @request.auth.id",
   "viewRule": "user_id = @request.auth.id",
   "createRule": "@request.auth.id != \"\"",
@@ -302,7 +366,7 @@ create_workout_sessions_collection() {
 EOF
 }
 
-create_workout_history_collection() {
+create_workout_history_collection_schema() {
     local users_id="$1"
     local workout_sessions_id="$2"
     cat << EOF
@@ -321,7 +385,14 @@ create_workout_history_collection() {
     {"name": "total_weight", "type": "number", "required": false},
     {"name": "notes", "type": "text", "required": false},
     {"name": "performance_data", "type": "json", "required": false}
-  ],
+  ]
+}
+EOF
+}
+
+create_workout_history_collection_rules() {
+    cat << 'EOF'
+{
   "listRule": "user_id = @request.auth.id",
   "viewRule": "user_id = @request.auth.id",
   "createRule": "@request.auth.id != \"\"",
@@ -399,13 +470,18 @@ main() {
         users_id=$(get_collection_id "$auth_token" "users")
         debug_log "users collection ID: $users_id"
     else
-        local collection_data="$(create_users_collection)"
+        # Step 1: Create collection with schema only (no rules)
+        local collection_data="$(create_users_collection_schema)"
         if create_collection "$auth_token" "$collection_data" "users"; then
             created=$((created + 1))
             sleep 1
             # Fetch the newly created collection ID
             users_id=$(get_collection_id "$auth_token" "users")
             debug_log "Created users collection with ID: $users_id"
+            
+            # Step 2: Update collection with rules
+            local rules_data="$(create_users_collection_rules)"
+            update_collection_rules "$auth_token" "$users_id" "$rules_data" "users"
         fi
     fi
     
@@ -431,11 +507,16 @@ main() {
         skipped=$((skipped + 1))
         exercises_id=$(get_collection_id "$auth_token" "exercises")
     else
-        local collection_data="$(create_exercises_collection "$users_id")"
+        # Step 1: Create collection with schema only (no rules)
+        local collection_data="$(create_exercises_collection_schema "$users_id")"
         if create_collection "$auth_token" "$collection_data" "exercises"; then
             created=$((created + 1))
             sleep 0.5
             exercises_id=$(get_collection_id "$auth_token" "exercises")
+            
+            # Step 2: Update collection with rules
+            local rules_data="$(create_exercises_collection_rules)"
+            update_collection_rules "$auth_token" "$exercises_id" "$rules_data" "exercises"
         fi
     fi
     
@@ -445,11 +526,16 @@ main() {
         skipped=$((skipped + 1))
         workouts_id=$(get_collection_id "$auth_token" "workouts")
     else
-        local collection_data="$(create_workouts_collection "$users_id")"
+        # Step 1: Create collection with schema only (no rules)
+        local collection_data="$(create_workouts_collection_schema "$users_id")"
         if create_collection "$auth_token" "$collection_data" "workouts"; then
             created=$((created + 1))
             sleep 0.5
             workouts_id=$(get_collection_id "$auth_token" "workouts")
+            
+            # Step 2: Update collection with rules
+            local rules_data="$(create_workouts_collection_rules)"
+            update_collection_rules "$auth_token" "$workouts_id" "$rules_data" "workouts"
         fi
     fi
     
@@ -473,11 +559,16 @@ main() {
         skipped=$((skipped + 1))
         workout_plans_id=$(get_collection_id "$auth_token" "workout_plans")
     else
-        local collection_data="$(create_workout_plans_collection "$users_id")"
+        # Step 1: Create collection with schema only (no rules)
+        local collection_data="$(create_workout_plans_collection_schema "$users_id")"
         if create_collection "$auth_token" "$collection_data" "workout_plans"; then
             created=$((created + 1))
             sleep 0.5
             workout_plans_id=$(get_collection_id "$auth_token" "workout_plans")
+            
+            # Step 2: Update collection with rules
+            local rules_data="$(create_workout_plans_collection_rules)"
+            update_collection_rules "$auth_token" "$workout_plans_id" "$rules_data" "workout_plans"
         fi
     fi
     
@@ -487,11 +578,16 @@ main() {
         skipped=$((skipped + 1))
         workout_sessions_id=$(get_collection_id "$auth_token" "workout_sessions")
     else
-        local collection_data="$(create_workout_sessions_collection "$workouts_id" "$users_id")"
+        # Step 1: Create collection with schema only (no rules)
+        local collection_data="$(create_workout_sessions_collection_schema "$workouts_id" "$users_id")"
         if create_collection "$auth_token" "$collection_data" "workout_sessions"; then
             created=$((created + 1))
             sleep 0.5
             workout_sessions_id=$(get_collection_id "$auth_token" "workout_sessions")
+            
+            # Step 2: Update collection with rules
+            local rules_data="$(create_workout_sessions_collection_rules)"
+            update_collection_rules "$auth_token" "$workout_sessions_id" "$rules_data" "workout_sessions"
         fi
     fi
     
@@ -515,10 +611,15 @@ main() {
         skipped=$((skipped + 1))
         workout_history_id=$(get_collection_id "$auth_token" "workout_history")
     else
-        local collection_data="$(create_workout_history_collection "$users_id" "$workout_sessions_id")"
+        # Step 1: Create collection with schema only (no rules)
+        local collection_data="$(create_workout_history_collection_schema "$users_id" "$workout_sessions_id")"
         if create_collection "$auth_token" "$collection_data" "workout_history"; then
             created=$((created + 1))
             workout_history_id=$(get_collection_id "$auth_token" "workout_history")
+            
+            # Step 2: Update collection with rules
+            local rules_data="$(create_workout_history_collection_rules)"
+            update_collection_rules "$auth_token" "$workout_history_id" "$rules_data" "workout_history"
         fi
     fi
 
