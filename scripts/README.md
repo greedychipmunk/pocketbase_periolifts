@@ -4,7 +4,10 @@ This directory contains administrative scripts for managing the PerioLifts Pocke
 
 ## Available Scripts
 
-- **Collection Initialization** (`init_collections.dart`, `init-collections.sh`) - Automatically creates missing PocketBase collections using Dart SDK
+- **Collection Initialization** (`init-collections-curl.sh`, `init_collections.dart`, `init-collections.sh`) - Automatically creates missing PocketBase collections
+  - `init-collections-curl.sh` - Bash script using cURL (used by Docker, no Dart SDK required)
+  - `init_collections.dart` - Dart-based script (requires Dart SDK)
+  - `init-collections.sh` - Shell wrapper for Dart script
 - **User Email Verification** (`verify_user_email.dart`) - Marks user emails as verified
 
 ## Prerequisites
@@ -32,25 +35,45 @@ npm run scripts:install
 
 ### Collection Initialization (Auto-run with Docker)
 
-The `init_collections.dart` script automatically creates missing PocketBase collections when you run `docker compose up`.
+The collection initialization scripts automatically create missing PocketBase collections when you run `docker compose up`.
+
+**Important:** As of PocketBase v0.23.0+, collections with relation fields require actual collection IDs (not names). The scripts handle this by:
+1. Creating collections in dependency order
+2. Fetching collection IDs after creation
+3. Using actual IDs when defining relation fields
 
 **Collections Created:**
 
 1. **users** (auth) - User profiles and authentication
-2. **exercises** (base) - Exercise definitions and custom exercises  
-3. **workouts** (base) - Workout templates and instances
-4. **workout_plans** (base) - Structured workout programs
-5. **workout_sessions** (base) - Active workout tracking
-6. **workout_history** (base) - Completed workout records
+2. **exercises** (base) - Exercise definitions and custom exercises (relates to users)
+3. **workouts** (base) - Workout templates and instances (relates to users)
+4. **workout_plans** (base) - Structured workout programs (relates to users)
+5. **workout_sessions** (base) - Active workout tracking (relates to workouts and users)
+6. **workout_history** (base) - Completed workout records (relates to users and workout_sessions)
 
 **Usage with Docker (Recommended):**
 
 ```bash
-# Collections are created automatically
+# Collections are created automatically using init-collections-curl.sh
 docker compose up
 ```
 
-**Manual Usage:**
+The Docker setup uses `init-collections-curl.sh` which requires only cURL (no Dart SDK needed in the container).
+
+**Manual Usage (cURL-based script):**
+
+```bash
+# Set environment variables
+export POCKETBASE_HOST=localhost
+export POCKETBASE_PORT=8090
+export POCKETBASE_ADMIN_EMAIL=your-admin@example.com
+export POCKETBASE_ADMIN_PASSWORD=your-password
+
+# Run the script
+./scripts/init-collections-curl.sh
+```
+
+**Manual Usage (Dart-based script):**
 
 ```bash
 # Set environment variables
@@ -72,11 +95,25 @@ dart run init_collections.dart
 
 **Configuration:**
 
-The script reads from your `.env` file:
+The scripts read from your `.env` file or environment variables:
 - `POCKETBASE_HOST` - PocketBase hostname (default: localhost)
 - `POCKETBASE_PORT` - PocketBase port (default: 8090) 
 - `POCKETBASE_ADMIN_EMAIL` - Admin email for authentication
 - `POCKETBASE_ADMIN_PASSWORD` - Admin password for authentication
+
+**First-Time Setup (PocketBase v0.23.0+):**
+
+PocketBase v0.23.0+ requires manual superuser creation on first run:
+
+1. Start PocketBase: `docker compose up`
+2. Visit http://localhost:8090/_/ in your browser
+3. Create a superuser account (one-time setup)
+4. Update `.env` with your superuser credentials
+5. Restart: `docker compose down && docker compose up`
+
+**Troubleshooting:**
+
+For detailed testing and troubleshooting information, see [TESTING_COLLECTIONS.md](./TESTING_COLLECTIONS.md).
 
 ### User Email Verification
 
