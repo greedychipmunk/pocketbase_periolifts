@@ -7,6 +7,16 @@
 
 set -e
 
+# Enable debug mode by setting DEBUG=1 environment variable
+DEBUG=${DEBUG:-0}
+
+# Debug logging function
+debug_log() {
+    if [ "$DEBUG" = "1" ]; then
+        echo "Debug: $*" >&2
+    fi
+}
+
 echo "🚀 Starting PocketBase collection initialization..."
 
 # Set default values if environment variables are not set
@@ -59,7 +69,7 @@ check_superuser_exists() {
         return 0
     else
         echo "⚠️  Superuser check failed"
-        echo "Debug: Auth response: $auth_response" >&2
+        debug_log "Auth response: $auth_response"
         return 1
     fi
 }
@@ -72,13 +82,13 @@ authenticate_admin() {
     local auth_response
     local endpoint="/api/collections/_superusers/auth-with-password"
     
-    echo "🔄 Using endpoint: $endpoint" >&2
+    debug_log "Using endpoint: $endpoint"
     auth_response=$(curl -s -X POST "${BASE_URL}${endpoint}" \
         -H "Content-Type: application/json" \
         -d "{\"identity\":\"$POCKETBASE_ADMIN_EMAIL\",\"password\":\"$POCKETBASE_ADMIN_PASSWORD\"}" \
         2>/dev/null)
     
-    echo "Debug: Response from $endpoint: $auth_response" >&2
+    debug_log "Response from $endpoint: $auth_response"
     
     if echo "$auth_response" | grep -q '"token"'; then
         echo "✅ Authentication successful" >&2
@@ -88,10 +98,10 @@ authenticate_admin() {
             # Fallback method using grep and cut
             token=$(echo "$auth_response" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
         fi
-        echo "Debug: Extracted token: '$token'" >&2
+        debug_log "Extracted token: '${token:0:20}...'"
         echo "$token"
     else
-        echo "Debug: No token found in response" >&2
+        debug_log "No token found in response"
         echo ""
     fi
 }
@@ -105,6 +115,27 @@ get_existing_collections() {
         2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort
 }
 
+# Function to get collection ID by name
+get_collection_id() {
+    local token="$1"
+    local collection_name="$2"
+    
+    local response
+    response=$(curl -s -X GET "${BASE_URL}/api/collections" \
+        -H "Authorization: Bearer $token" \
+        2>/dev/null)
+    
+    # Try using jq first if available (most reliable)
+    if command -v jq >/dev/null 2>&1; then
+        echo "$response" | jq -r ".items[] | select(.name == \"$collection_name\") | .id" 2>/dev/null
+    else
+        # Fallback to grep/sed parsing
+        # Note: Assumes flat JSON structure without nested objects in collection items
+        # If PocketBase API changes significantly, consider installing jq
+        echo "$response" | grep -o "{[^}]*\"name\":\"$collection_name\"[^}]*}" | grep -o "\"id\":\"[^\"]*\"" | cut -d'"' -f4 | head -1
+    fi
+}
+
 # Function to create a collection
 create_collection() {
     local token="$1"
@@ -112,7 +143,7 @@ create_collection() {
     local collection_name="$3"
     
     echo "📄 Creating collection: $collection_name"
-    echo "Debug: Using token: ${token:0:20}..." >&2
+    debug_log "Using token: ${token:0:20}..."
     
     local response
     response=$(curl -s -X POST "${BASE_URL}/api/collections" \
@@ -170,7 +201,8 @@ EOF
 }
 
 create_exercises_collection() {
-    cat << 'EOF'
+    local users_id="$1"
+    cat << EOF
 {
   "name": "exercises",
   "type": "base",
@@ -182,7 +214,7 @@ create_exercises_collection() {
     {"name": "image_url", "type": "url", "required": false},
     {"name": "video_url", "type": "url", "required": false},
     {"name": "is_custom", "type": "bool", "required": true},
-    {"name": "user_id", "type": "relation", "options": {"collectionId": "users"}, "required": false}
+    {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": false}
   ],
   "listRule": "is_custom = false || user_id = @request.auth.id",
   "viewRule": "is_custom = false || user_id = @request.auth.id",
@@ -194,7 +226,8 @@ EOF
 }
 
 create_workouts_collection() {
-    cat << 'EOF'
+    local users_id="$1"
+    cat << EOF
 {
   "name": "workouts",
   "type": "base",
@@ -203,7 +236,7 @@ create_workouts_collection() {
     {"name": "description", "type": "text", "required": false},
     {"name": "estimated_duration", "type": "number", "required": false},
     {"name": "exercises", "type": "json", "required": true},
-    {"name": "user_id", "type": "relation", "options": {"collectionId": "users"}, "required": true},
+    {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": true},
     {"name": "scheduled_date", "type": "date", "required": false},
     {"name": "is_completed", "type": "bool", "required": false},
     {"name": "completed_date", "type": "date", "required": false},
@@ -220,7 +253,8 @@ EOF
 }
 
 create_workout_plans_collection() {
-    cat << 'EOF'
+    local users_id="$1"
+    cat << EOF
 {
   "name": "workout_plans",
   "type": "base",
@@ -230,7 +264,7 @@ create_workout_plans_collection() {
     {"name": "start_date", "type": "date", "required": true},
     {"name": "schedule", "type": "json", "required": true},
     {"name": "is_active", "type": "bool", "required": false},
-    {"name": "user_id", "type": "relation", "options": {"collectionId": "users"}, "required": true}
+    {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": true}
   ],
   "listRule": "user_id = @request.auth.id",
   "viewRule": "user_id = @request.auth.id",
@@ -242,13 +276,15 @@ EOF
 }
 
 create_workout_sessions_collection() {
-    cat << 'EOF'
+    local workouts_id="$1"
+    local users_id="$2"
+    cat << EOF
 {
   "name": "workout_sessions",
   "type": "base",
   "schema": [
-    {"name": "workout_id", "type": "relation", "options": {"collectionId": "workouts"}, "required": true},
-    {"name": "user_id", "type": "relation", "options": {"collectionId": "users"}, "required": true},
+    {"name": "workout_id", "type": "relation", "options": {"collectionId": "$workouts_id"}, "required": true},
+    {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": true},
     {"name": "started_at", "type": "date", "required": true},
     {"name": "completed_at", "type": "date", "required": false},
     {"name": "is_completed", "type": "bool", "required": false},
@@ -267,13 +303,15 @@ EOF
 }
 
 create_workout_history_collection() {
-    cat << 'EOF'
+    local users_id="$1"
+    local workout_sessions_id="$2"
+    cat << EOF
 {
   "name": "workout_history",
   "type": "base",
   "schema": [
-    {"name": "user_id", "type": "relation", "options": {"collectionId": "users"}, "required": true},
-    {"name": "workout_session_id", "type": "relation", "options": {"collectionId": "workout_sessions"}, "required": true},
+    {"name": "user_id", "type": "relation", "options": {"collectionId": "$users_id"}, "required": true},
+    {"name": "workout_session_id", "type": "relation", "options": {"collectionId": "$workout_sessions_id"}, "required": true},
     {"name": "workout_name", "type": "text", "required": true},
     {"name": "completed_at", "type": "date", "required": true},
     {"name": "duration", "type": "number", "required": false},
@@ -331,8 +369,8 @@ main() {
     fi
     
     echo "✅ Superuser authentication successful"
-    echo "Debug: Token length: ${#auth_token}" >&2
-    echo "Debug: Token preview: ${auth_token:0:20}..." >&2
+    debug_log "Token length: ${#auth_token}"
+    debug_log "Token preview: ${auth_token:0:20}..."
 
     # Get existing collections
     echo "📋 Checking existing collections..."
@@ -345,45 +383,144 @@ main() {
     local created=0
     local skipped=0
     
-    # Create collections one by one
-    local collections="users exercises workouts workout_plans workout_sessions workout_history"
+    # Store collection IDs as we create them
+    local users_id=""
+    local exercises_id=""
+    local workouts_id=""
+    local workout_plans_id=""
+    local workout_sessions_id=""
+    local workout_history_id=""
     
-    for collection_name in $collections; do
-        if echo "$existing_collections" | grep -q "^$collection_name$"; then
-            echo "⏭️  Collection '$collection_name' already exists, skipping"
-            skipped=$((skipped + 1))
-        else
-            local collection_data=""
-            case $collection_name in
-                "users")
-                    collection_data="$(create_users_collection)"
-                    ;;
-                "exercises") 
-                    collection_data="$(create_exercises_collection)"
-                    ;;
-                "workouts")
-                    collection_data="$(create_workouts_collection)"
-                    ;;
-                "workout_plans")
-                    collection_data="$(create_workout_plans_collection)"
-                    ;;
-                "workout_sessions")
-                    collection_data="$(create_workout_sessions_collection)"
-                    ;;
-                "workout_history")
-                    collection_data="$(create_workout_history_collection)"
-                    ;;
-            esac
-            
-            if [ -n "$collection_data" ]; then
-                if create_collection "$auth_token" "$collection_data" "$collection_name"; then
-                    created=$((created + 1))
-                fi
-            fi
-            # Small delay between requests
-            sleep 0.5
+    # Create users collection first (it has no dependencies)
+    if echo "$existing_collections" | grep -q "^users$"; then
+        echo "⏭️  Collection 'users' already exists, skipping"
+        skipped=$((skipped + 1))
+        # Get existing users collection ID
+        users_id=$(get_collection_id "$auth_token" "users")
+        debug_log "users collection ID: $users_id"
+    else
+        local collection_data="$(create_users_collection)"
+        if create_collection "$auth_token" "$collection_data" "users"; then
+            created=$((created + 1))
+            sleep 1
+            # Fetch the newly created collection ID
+            users_id=$(get_collection_id "$auth_token" "users")
+            debug_log "Created users collection with ID: $users_id"
         fi
-    done
+    fi
+    
+    # Verify we have users_id before proceeding
+    if [ -z "$users_id" ]; then
+        echo "❌ Failed to get users collection ID. Cannot create dependent collections."
+        echo ""
+        echo "Possible causes:"
+        echo "  - Users collection was not created successfully"
+        echo "  - API response format changed"
+        echo "  - Network or authentication issues"
+        echo ""
+        echo "Debugging steps:"
+        echo "  1. Enable debug mode: DEBUG=1 $0"
+        echo "  2. Check PocketBase logs: docker compose logs pocketbase"
+        echo "  3. Verify API access: curl http://\${POCKETBASE_HOST}:\${POCKETBASE_PORT}/api/collections"
+        exit 1
+    fi
+    
+    # Create exercises collection (depends on users)
+    if echo "$existing_collections" | grep -q "^exercises$"; then
+        echo "⏭️  Collection 'exercises' already exists, skipping"
+        skipped=$((skipped + 1))
+        exercises_id=$(get_collection_id "$auth_token" "exercises")
+    else
+        local collection_data="$(create_exercises_collection "$users_id")"
+        if create_collection "$auth_token" "$collection_data" "exercises"; then
+            created=$((created + 1))
+            sleep 0.5
+            exercises_id=$(get_collection_id "$auth_token" "exercises")
+        fi
+    fi
+    
+    # Create workouts collection (depends on users)
+    if echo "$existing_collections" | grep -q "^workouts$"; then
+        echo "⏭️  Collection 'workouts' already exists, skipping"
+        skipped=$((skipped + 1))
+        workouts_id=$(get_collection_id "$auth_token" "workouts")
+    else
+        local collection_data="$(create_workouts_collection "$users_id")"
+        if create_collection "$auth_token" "$collection_data" "workouts"; then
+            created=$((created + 1))
+            sleep 0.5
+            workouts_id=$(get_collection_id "$auth_token" "workouts")
+        fi
+    fi
+    
+    # Verify we have workouts_id before creating workout_sessions
+    if [ -z "$workouts_id" ]; then
+        echo "❌ Failed to get workouts collection ID. Cannot create workout_sessions."
+        echo ""
+        echo "Possible causes:"
+        echo "  - Workouts collection was not created successfully"
+        echo "  - API response format changed"
+        echo ""
+        echo "Debugging steps:"
+        echo "  1. Enable debug mode: DEBUG=1 $0"
+        echo "  2. Check if workouts collection exists in PocketBase admin UI"
+        exit 1
+    fi
+    
+    # Create workout_plans collection (depends on users)
+    if echo "$existing_collections" | grep -q "^workout_plans$"; then
+        echo "⏭️  Collection 'workout_plans' already exists, skipping"
+        skipped=$((skipped + 1))
+        workout_plans_id=$(get_collection_id "$auth_token" "workout_plans")
+    else
+        local collection_data="$(create_workout_plans_collection "$users_id")"
+        if create_collection "$auth_token" "$collection_data" "workout_plans"; then
+            created=$((created + 1))
+            sleep 0.5
+            workout_plans_id=$(get_collection_id "$auth_token" "workout_plans")
+        fi
+    fi
+    
+    # Create workout_sessions collection (depends on workouts and users)
+    if echo "$existing_collections" | grep -q "^workout_sessions$"; then
+        echo "⏭️  Collection 'workout_sessions' already exists, skipping"
+        skipped=$((skipped + 1))
+        workout_sessions_id=$(get_collection_id "$auth_token" "workout_sessions")
+    else
+        local collection_data="$(create_workout_sessions_collection "$workouts_id" "$users_id")"
+        if create_collection "$auth_token" "$collection_data" "workout_sessions"; then
+            created=$((created + 1))
+            sleep 0.5
+            workout_sessions_id=$(get_collection_id "$auth_token" "workout_sessions")
+        fi
+    fi
+    
+    # Verify we have workout_sessions_id before creating workout_history
+    if [ -z "$workout_sessions_id" ]; then
+        echo "❌ Failed to get workout_sessions collection ID. Cannot create workout_history."
+        echo ""
+        echo "Possible causes:"
+        echo "  - Workout_sessions collection was not created successfully"
+        echo "  - API response format changed"
+        echo ""
+        echo "Debugging steps:"
+        echo "  1. Enable debug mode: DEBUG=1 $0"
+        echo "  2. Check if workout_sessions collection exists in PocketBase admin UI"
+        exit 1
+    fi
+    
+    # Create workout_history collection (depends on users and workout_sessions)
+    if echo "$existing_collections" | grep -q "^workout_history$"; then
+        echo "⏭️  Collection 'workout_history' already exists, skipping"
+        skipped=$((skipped + 1))
+        workout_history_id=$(get_collection_id "$auth_token" "workout_history")
+    else
+        local collection_data="$(create_workout_history_collection "$users_id" "$workout_sessions_id")"
+        if create_collection "$auth_token" "$collection_data" "workout_history"; then
+            created=$((created + 1))
+            workout_history_id=$(get_collection_id "$auth_token" "workout_history")
+        fi
+    fi
 
     echo "🎉 Collection initialization complete!"
     echo "📊 Summary: $created created, $skipped skipped"
