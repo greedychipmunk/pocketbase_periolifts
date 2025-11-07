@@ -24,7 +24,7 @@ migrate((app) => {
   console.log("")
   console.log("To create the admin account, use one of these methods:")
   console.log("  1. Access http://localhost:8090/_/ and create via UI")
-  console.log("  2. Run: docker exec periolifts_pocketbase ./pocketbase superuser \\")
+  console.log("  2. Run: docker exec <pocketbase_container> ./pocketbase superuser \\")
   console.log("         upsert", email, password)
   console.log("=" .repeat(70))
 

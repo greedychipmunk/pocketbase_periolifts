@@ -18,39 +18,34 @@ PocketBase migrations are JavaScript files that define database schema changes i
 
 ### Core Collections (in dependency order)
 
-2. **`1732713601_create_users.js`** - Creates the users auth collection
-   - User authentication and profile data
-   - Fitness preferences and settings
-   - Subscription and notification preferences
-
-3. **`1732713601_create_exercises.js`** - Creates the exercises collection
+2. **`1732713601_create_exercises.js`** - Creates the exercises collection
    - Exercise definitions and metadata
    - Custom vs. default exercises
    - User-specific exercises with relation to users
 
-4. **`1732713602_create_workouts.js`** - Creates the workouts collection
+3. **`1732713602_create_workouts.js`** - Creates the workouts collection
    - Workout templates and definitions
    - User-specific workouts with relation to users
    - Exercise lists and scheduling information
 
-5. **`1732713603_create_workout_plans.js`** - Creates the workout_plans collection
+4. **`1732713603_create_workout_plans.js`** - Creates the workout_plans collection
    - Long-term workout planning
    - Scheduling and progression tracking
    - User-specific plans with relation to users
 
-6. **`1732713604_create_workout_sessions.js`** - Creates the workout_sessions collection
+5. **`1732713604_create_workout_sessions.js`** - Creates the workout_sessions collection
    - Individual workout execution records
    - Relations to both users and workouts
    - Session timing and performance data
 
-7. **`1732713605_create_workout_history.js`** - Creates the workout_history collection
+6. **`1732713605_create_workout_history.js`** - Creates the workout_history collection
    - Historical workout performance data
    - Relations to users and workout_sessions
    - Aggregated statistics and notes
 
 ### Data Seeding
 
-8. **`1732713606_seed_default_exercises.js`** - Seeds default exercises
+7. **`1732713606_seed_default_exercises.js`** - Seeds default exercises
    - Creates a set of common exercises available to all users
    - Includes exercises for strength, cardio, and core training
 
