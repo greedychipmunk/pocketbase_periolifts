@@ -8,41 +8,49 @@ PocketBase migrations are JavaScript files that define database schema changes i
 
 ## Migration Files
 
+### Initial Setup
+
+1. **`1732713600_init_superuser.js`** - Initial superuser/admin setup
+   - Documents admin credentials from environment variables
+   - Provides instructions for admin account creation
+   - Reads `POCKETBASE_ADMIN_EMAIL` and `POCKETBASE_ADMIN_PASSWORD` from .env
+   - Note: Actual admin creation must be done via CLI or admin UI
+
 ### Core Collections (in dependency order)
 
-1. **`1732713600_create_users.js`** - Creates the users auth collection
+2. **`1732713601_create_users.js`** - Creates the users auth collection
    - User authentication and profile data
    - Fitness preferences and settings
    - Subscription and notification preferences
 
-2. **`1732713601_create_exercises.js`** - Creates the exercises collection
+3. **`1732713601_create_exercises.js`** - Creates the exercises collection
    - Exercise definitions and metadata
    - Custom vs. default exercises
    - User-specific exercises with relation to users
 
-3. **`1732713602_create_workouts.js`** - Creates the workouts collection
+4. **`1732713602_create_workouts.js`** - Creates the workouts collection
    - Workout templates and definitions
    - User-specific workouts with relation to users
    - Exercise lists and scheduling information
 
-4. **`1732713603_create_workout_plans.js`** - Creates the workout_plans collection
+5. **`1732713603_create_workout_plans.js`** - Creates the workout_plans collection
    - Long-term workout planning
    - Scheduling and progression tracking
    - User-specific plans with relation to users
 
-5. **`1732713604_create_workout_sessions.js`** - Creates the workout_sessions collection
+6. **`1732713604_create_workout_sessions.js`** - Creates the workout_sessions collection
    - Individual workout execution records
    - Relations to both users and workouts
    - Session timing and performance data
 
-6. **`1732713605_create_workout_history.js`** - Creates the workout_history collection
+7. **`1732713605_create_workout_history.js`** - Creates the workout_history collection
    - Historical workout performance data
    - Relations to users and workout_sessions
    - Aggregated statistics and notes
 
 ### Data Seeding
 
-7. **`1732713606_seed_default_exercises.js`** - Seeds default exercises
+8. **`1732713606_seed_default_exercises.js`** - Seeds default exercises
    - Creates a set of common exercises available to all users
    - Includes exercises for strength, cardio, and core training
 
