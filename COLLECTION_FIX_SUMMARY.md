@@ -3,20 +3,47 @@
 ## Problem Solved
 Fixed the collection creation error that occurred when running `docker compose up`:
 ```
-Failed to create collection 'exercises': {"data":{"deleteRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"user_id\" - unknown field \"user_id\"."},"listRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"is_custom\" - unknown field \"is_custom\"."}}
+Failed to update rules for 'exercises': {"data":{"deleteRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"user_id\" - unknown field \"user_id\"."},"listRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"is_custom\" - unknown field \"is_custom\"."},"updateRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"user_id\" - unknown field \"user_id\"."},"viewRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"is_custom\" - unknown field \"is_custom\"."}},"message":"Failed to update collection.","status":400}
 ```
 
 ## Root Cause
+
+There were TWO separate issues that both needed to be fixed:
+
+### Issue 1: Rule Validation Timing (Previously Fixed in Shell Script)
 PocketBase validates API rules (listRule, viewRule, createRule, updateRule, deleteRule) against the collection schema **during** the collection creation API call. However, this validation occurs **before** the schema fields are actually created, causing a chicken-and-egg problem where rules reference fields that don't exist yet during the validation phase.
 
-This results in errors like:
-- "invalid left operand 'user_id' - unknown field 'user_id'"
-- "invalid left operand 'is_custom' - unknown field 'is_custom'"
+**Solution**: Separate collection creation into two steps - first create the schema, then update with rules.
 
-Even though these fields are defined in the schema being sent in the same API call, PocketBase validates the rules against an empty schema first.
+### Issue 2: Collection Names vs Collection IDs (Fixed in this update)
+The Dart initialization script (`scripts/init_collections.dart`) was using collection **names** (e.g., `'users'`, `'workouts'`) instead of collection **IDs** (UUIDs) when defining relation fields. PocketBase requires actual collection IDs for relation field validation.
 
-### Note: Different from Previous Fix
-A previous fix addressed the issue of using collection **names** instead of collection **IDs** for relation fields (e.g., `"collectionId": "users"` vs `"collectionId": "<actual-uuid>"`). That fix is still in place with the `get_collection_id()` function and dependency-ordered creation. This current fix addresses a **different** issue: the validation timing of rules vs schema fields.
+When relation fields are defined with collection names instead of IDs:
+- The relation field is not properly created in the schema
+- When rules are applied in step 2, PocketBase doesn't recognize the field (e.g., `user_id`) as valid
+- This causes errors like "invalid left operand 'user_id' - unknown field 'user_id'"
+
+**Example of the problem**:
+```dart
+// INCORRECT - Using collection name
+FieldSchema(
+  name: 'user_id',
+  type: 'relation',
+  options: {'collectionId': 'users'},  // ❌ Should be UUID, not name
+),
+```
+
+**Example of the fix**:
+```dart
+// CORRECT - Using actual collection ID
+FieldSchema(
+  name: 'user_id',
+  type: 'relation',
+  options: {'collectionId': usersId},  // ✅ usersId is the actual UUID
+),
+```
+
+**Note**: The shell script (`scripts/init-collections-curl.sh`) was already correctly handling this by fetching collection IDs and using them. However, the Dart script had hardcoded collection names and needed to be updated to match the shell script's approach.
 
 ## Solution Implemented
 
@@ -57,10 +84,48 @@ The fix separates collection creation into two distinct API calls:
 
 #### Dart Script (`scripts/init_collections.dart`)
 
-1. **Modified `CollectionSchema.toJson()` Method**
+**Previous State** (from earlier fix):
+1. Modified `CollectionSchema.toJson()` Method
    - Added optional parameter `includeRules` (default: true for backward compatibility)
    - When `includeRules = false`, returns schema without validation rules
    - When `includeRules = true`, returns complete schema with rules
+
+2. New Method: `CollectionSchema.toRulesJson()`
+   - Returns only the validation rules
+   - Used for the update step
+
+3. Updated `createCollection()` Method
+   - Step 1: Create collection with `toJson(includeRules: false)`
+   - Step 2: Update collection with `toRulesJson()`
+   - Both steps include proper logging
+
+**New Changes** (this fix):
+1. **Converted Static Collection Definitions to Factory Functions**
+   - Changed from: `final collections = <String, CollectionSchema>{...}`
+   - Changed to: Individual factory functions that accept collection IDs as parameters
+   - Functions: `createUsersCollection()`, `createExercisesCollection(String usersId)`, etc.
+   - This allows dynamic resolution of collection IDs instead of hardcoded names
+
+2. **Updated `createCollection()` Method to Return Collection ID**
+   - Changed return type from `Future<bool>` to `Future<String?>`
+   - Now returns the created collection's ID for use in dependent collections
+   - Returns `null` on failure
+
+3. **Refactored `initializeCollections()` Method**
+   - Added `collectionIds` map to track created collection IDs
+   - Created helper function `ensureCollection()` to handle creation or ID retrieval
+   - Implements dependency-ordered creation:
+     1. Users (no dependencies)
+     2. Exercises, Workouts, Workout Plans (depend on Users)
+     3. Workout Sessions (depend on Workouts and Users)
+     4. Workout History (depend on Users and Workout Sessions)
+   - Each collection receives the actual IDs of its dependencies
+   - Handles existing collections by retrieving their IDs from the API
+
+4. **Fixed Relation Field Definitions**
+   - Before: `options: {'collectionId': 'users'}` (hardcoded name ❌)
+   - After: `options: {'collectionId': usersId}` (dynamic ID ✅)
+   - Applied to all relation fields across all collections
 
 2. **New Method: `CollectionSchema.toRulesJson()`**
    - Returns only the validation rules
@@ -72,16 +137,18 @@ The fix separates collection creation into two distinct API calls:
    - Both steps include proper logging
 
 ### Files Modified
-- `scripts/init-collections-curl.sh` - Main fix implementation (shell script)
-- `scripts/init_collections.dart` - Main fix implementation (Dart script)
+- `scripts/init-collections-curl.sh` - Shell script implementation (already fixed)
+- `scripts/init_collections.dart` - **Dart script implementation (fixed in this update)**
 - `COLLECTION_FIX_SUMMARY.md` - Updated documentation
 
 ### Key Benefits
 1. **Eliminates validation errors** - Rules are only validated after fields exist
-2. **Works with all PocketBase versions** - Compatible with v0.23.0+
-3. **Maintains backward compatibility** - Existing collections are not affected
-4. **Clear separation of concerns** - Schema and rules are independent
-5. **Better error messages** - Separate steps make debugging easier
+2. **Proper relation fields** - Uses actual collection IDs instead of names
+3. **Works with all PocketBase versions** - Compatible with v0.23.0+
+4. **Maintains backward compatibility** - Existing collections are not affected
+5. **Clear separation of concerns** - Schema and rules are independent
+6. **Dependency-ordered creation** - Collections created in the correct order
+7. **Better error messages** - Separate steps make debugging easier
 
 ## How to Test
 
