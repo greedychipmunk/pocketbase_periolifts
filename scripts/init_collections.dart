@@ -94,9 +94,11 @@ class FieldSchema {
   }
 }
 
-/// Collection definitions based on the Flutter models
-final collections = <String, CollectionSchema>{
-  'users': CollectionSchema(
+/// Collection factory functions that accept dynamic collection IDs
+/// This allows us to use actual PocketBase collection IDs instead of names
+
+CollectionSchema createUsersCollection() {
+  return CollectionSchema(
     name: 'users',
     type: 'auth',
     schema: [
@@ -156,9 +158,11 @@ final collections = <String, CollectionSchema>{
     createRule: '',
     updateRule: 'id = @request.auth.id',
     deleteRule: 'id = @request.auth.id',
-  ),
+  );
+}
 
-  'exercises': CollectionSchema(
+CollectionSchema createExercisesCollection(String usersId) {
+  return CollectionSchema(
     name: 'exercises',
     type: 'base',
     schema: [
@@ -172,7 +176,7 @@ final collections = <String, CollectionSchema>{
       FieldSchema(
         name: 'user_id',
         type: 'relation',
-        options: {'collectionId': 'users'},
+        options: {'collectionId': usersId},
       ),
     ],
     listRule: 'is_custom = false || user_id = @request.auth.id',
@@ -180,9 +184,11 @@ final collections = <String, CollectionSchema>{
     createRule: '@request.auth.id != ""',
     updateRule: 'user_id = @request.auth.id',
     deleteRule: 'user_id = @request.auth.id',
-  ),
+  );
+}
 
-  'workouts': CollectionSchema(
+CollectionSchema createWorkoutsCollection(String usersId) {
+  return CollectionSchema(
     name: 'workouts',
     type: 'base',
     schema: [
@@ -193,7 +199,7 @@ final collections = <String, CollectionSchema>{
       FieldSchema(
         name: 'user_id',
         type: 'relation',
-        options: {'collectionId': 'users'},
+        options: {'collectionId': usersId},
         required: true,
       ),
       FieldSchema(name: 'scheduled_date', type: 'date'),
@@ -207,9 +213,11 @@ final collections = <String, CollectionSchema>{
     createRule: '@request.auth.id != ""',
     updateRule: 'user_id = @request.auth.id',
     deleteRule: 'user_id = @request.auth.id',
-  ),
+  );
+}
 
-  'workout_plans': CollectionSchema(
+CollectionSchema createWorkoutPlansCollection(String usersId) {
+  return CollectionSchema(
     name: 'workout_plans',
     type: 'base',
     schema: [
@@ -221,7 +229,7 @@ final collections = <String, CollectionSchema>{
       FieldSchema(
         name: 'user_id',
         type: 'relation',
-        options: {'collectionId': 'users'},
+        options: {'collectionId': usersId},
         required: true,
       ),
     ],
@@ -230,22 +238,24 @@ final collections = <String, CollectionSchema>{
     createRule: '@request.auth.id != ""',
     updateRule: 'user_id = @request.auth.id',
     deleteRule: 'user_id = @request.auth.id',
-  ),
+  );
+}
 
-  'workout_sessions': CollectionSchema(
+CollectionSchema createWorkoutSessionsCollection(String workoutsId, String usersId) {
+  return CollectionSchema(
     name: 'workout_sessions',
     type: 'base',
     schema: [
       FieldSchema(
         name: 'workout_id',
         type: 'relation',
-        options: {'collectionId': 'workouts'},
+        options: {'collectionId': workoutsId},
         required: true,
       ),
       FieldSchema(
         name: 'user_id',
         type: 'relation',
-        options: {'collectionId': 'users'},
+        options: {'collectionId': usersId},
         required: true,
       ),
       FieldSchema(name: 'started_at', type: 'date', required: true),
@@ -261,22 +271,24 @@ final collections = <String, CollectionSchema>{
     createRule: '@request.auth.id != ""',
     updateRule: 'user_id = @request.auth.id',
     deleteRule: 'user_id = @request.auth.id',
-  ),
+  );
+}
 
-  'workout_history': CollectionSchema(
+CollectionSchema createWorkoutHistoryCollection(String usersId, String workoutSessionsId) {
+  return CollectionSchema(
     name: 'workout_history',
     type: 'base',
     schema: [
       FieldSchema(
         name: 'user_id',
         type: 'relation',
-        options: {'collectionId': 'users'},
+        options: {'collectionId': usersId},
         required: true,
       ),
       FieldSchema(
         name: 'workout_session_id',
         type: 'relation',
-        options: {'collectionId': 'workout_sessions'},
+        options: {'collectionId': workoutSessionsId},
         required: true,
       ),
       FieldSchema(name: 'workout_name', type: 'text', required: true),
@@ -294,8 +306,8 @@ final collections = <String, CollectionSchema>{
     createRule: '@request.auth.id != ""',
     updateRule: 'user_id = @request.auth.id',
     deleteRule: 'user_id = @request.auth.id',
-  ),
-};
+  );
+}
 
 /// PocketBase collection initializer
 class PocketBaseInitializer {
@@ -354,8 +366,8 @@ class PocketBaseInitializer {
     }
   }
 
-  /// Create a collection
-  Future<bool> createCollection(CollectionSchema collectionConfig) async {
+  /// Create a collection and return its ID
+  Future<String?> createCollection(CollectionSchema collectionConfig) async {
     try {
       print('📄 Creating collection: ${collectionConfig.name}');
       
@@ -364,7 +376,7 @@ class PocketBaseInitializer {
         body: collectionConfig.toJson(includeRules: false),
       );
       
-      print('✅ Collection \'${collectionConfig.name}\' created successfully');
+      print('✅ Collection \'${collectionConfig.name}\' created successfully (ID: ${collection.id})');
       
       // Step 2: Update collection with rules
       print('🔧 Updating rules for collection: ${collectionConfig.name}');
@@ -374,10 +386,10 @@ class PocketBaseInitializer {
       );
       
       print('✅ Rules for \'${collectionConfig.name}\' updated successfully');
-      return true;
+      return collection.id;
     } catch (e) {
       print('❌ Failed to create collection \'${collectionConfig.name}\': $e');
-      return false;
+      return null;
     }
   }
 
@@ -397,27 +409,72 @@ class PocketBaseInitializer {
     // Get existing collections
     final existingCollections = await getExistingCollections();
     final existingNames = existingCollections.map((col) => col.name).toSet();
+    final collectionIds = <String, String>{};
+    
+    // Add existing collection IDs to the map
+    for (final col in existingCollections) {
+      collectionIds[col.name] = col.id;
+    }
 
     print('📋 Existing collections: $existingNames');
 
-    // Create missing collections
     var created = 0;
     var skipped = 0;
 
-    for (final entry in collections.entries) {
-      final collectionName = entry.key;
-      final collectionConfig = entry.value;
-
-      if (existingNames.contains(collectionName)) {
-        print('⏭️  Collection \'$collectionName\' already exists, skipping');
+    // Helper function to create or get collection ID
+    Future<String?> ensureCollection(String name, CollectionSchema Function() factory) async {
+      if (existingNames.contains(name)) {
+        print('⏭️  Collection \'$name\' already exists, skipping');
         skipped++;
+        return collectionIds[name];
       } else {
-        final success = await createCollection(collectionConfig);
-        if (success) {
+        final id = await createCollection(factory());
+        if (id != null) {
           created++;
+          collectionIds[name] = id;
+          // Small delay between requests
+          await Future<void>.delayed(const Duration(milliseconds: 500));
         }
-        // Small delay between requests
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+        return id;
+      }
+    }
+
+    // Create collections in dependency order
+    // 1. Users collection (no dependencies)
+    final usersId = await ensureCollection('users', createUsersCollection);
+    if (usersId == null) {
+      throw Exception('Failed to create users collection');
+    }
+
+    // 2. Collections that depend only on users
+    final exercisesId = await ensureCollection(
+      'exercises',
+      () => createExercisesCollection(usersId),
+    );
+    
+    final workoutsId = await ensureCollection(
+      'workouts',
+      () => createWorkoutsCollection(usersId),
+    );
+    
+    final workoutPlansId = await ensureCollection(
+      'workout_plans',
+      () => createWorkoutPlansCollection(usersId),
+    );
+
+    // 3. Workout sessions (depends on workouts and users)
+    if (workoutsId != null) {
+      final workoutSessionsId = await ensureCollection(
+        'workout_sessions',
+        () => createWorkoutSessionsCollection(workoutsId, usersId),
+      );
+
+      // 4. Workout history (depends on users and workout_sessions)
+      if (workoutSessionsId != null) {
+        await ensureCollection(
+          'workout_history',
+          () => createWorkoutHistoryCollection(usersId, workoutSessionsId),
+        );
       }
     }
 
