@@ -41,11 +41,26 @@ class CollectionSchema {
     this.deleteRule,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
+  Map<String, dynamic> toJson({bool includeRules = true}) {
+    final json = {
       'name': name,
       'type': type,
       'schema': schema.map((field) => field.toJson()).toList(),
+    };
+    
+    if (includeRules) {
+      json['listRule'] = listRule;
+      json['viewRule'] = viewRule;
+      json['createRule'] = createRule;
+      json['updateRule'] = updateRule;
+      json['deleteRule'] = deleteRule;
+    }
+    
+    return json;
+  }
+  
+  Map<String, dynamic> toRulesJson() {
+    return {
       'listRule': listRule,
       'viewRule': viewRule,
       'createRule': createRule,
@@ -344,9 +359,21 @@ class PocketBaseInitializer {
     try {
       print('📄 Creating collection: ${collectionConfig.name}');
       
-      await pb.collections.create(body: collectionConfig.toJson());
+      // Step 1: Create collection with schema only (no rules)
+      final collection = await pb.collections.create(
+        body: collectionConfig.toJson(includeRules: false),
+      );
       
       print('✅ Collection \'${collectionConfig.name}\' created successfully');
+      
+      // Step 2: Update collection with rules
+      print('🔧 Updating rules for collection: ${collectionConfig.name}');
+      await pb.collections.update(
+        collection.id,
+        body: collectionConfig.toRulesJson(),
+      );
+      
+      print('✅ Rules for \'${collectionConfig.name}\' updated successfully');
       return true;
     } catch (e) {
       print('❌ Failed to create collection \'${collectionConfig.name}\': $e');

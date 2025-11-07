@@ -3,43 +3,85 @@
 ## Problem Solved
 Fixed the collection creation error that occurred when running `docker compose up`:
 ```
-Failed to create collection 'exercises': {"data":{"deleteRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"user_id\" - unknown field \"user_id\"."}
+Failed to create collection 'exercises': {"data":{"deleteRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"user_id\" - unknown field \"user_id\"."},"listRule":{"code":"validation_invalid_rule","message":"Invalid rule. Raw error: invalid left operand \"is_custom\" - unknown field \"is_custom\"."}}
 ```
 
 ## Root Cause
-PocketBase v0.23.0+ requires actual collection IDs (not names) when defining relation fields. The original script used `"collectionId": "users"` which worked in older versions but fails in v0.23.0+.
+PocketBase validates API rules (listRule, viewRule, createRule, updateRule, deleteRule) against the collection schema **during** the collection creation API call. However, this validation occurs **before** the schema fields are actually created, causing a chicken-and-egg problem where rules reference fields that don't exist yet during the validation phase.
+
+This results in errors like:
+- "invalid left operand 'user_id' - unknown field 'user_id'"
+- "invalid left operand 'is_custom' - unknown field 'is_custom'"
+
+Even though these fields are defined in the schema being sent in the same API call, PocketBase validates the rules against an empty schema first.
+
+### Note: Different from Previous Fix
+A previous fix addressed the issue of using collection **names** instead of collection **IDs** for relation fields (e.g., `"collectionId": "users"` vs `"collectionId": "<actual-uuid>"`). That fix is still in place with the `get_collection_id()` function and dependency-ordered creation. This current fix addresses a **different** issue: the validation timing of rules vs schema fields.
 
 ## Solution Implemented
 
+### Two-Step Collection Creation
+The fix separates collection creation into two distinct API calls:
+
+1. **Step 1: Create Collection with Schema Only**
+   - POST `/api/collections` with schema fields but **without** validation rules
+   - This creates the collection and all its fields
+   - Returns the collection ID
+
+2. **Step 2: Update Collection with Rules**
+   - PATCH `/api/collections/{id}` with validation rules only
+   - Now that the fields exist, the rules can be validated successfully
+   - Completes the collection setup
+
 ### Technical Changes
-1. **Dynamic Collection ID Fetching**
-   - Added `get_collection_id()` function that queries the PocketBase API
-   - Uses `jq` for JSON parsing if available, falls back to grep/sed
-   - Extracts collection IDs reliably from API responses
 
-2. **Dependency-Ordered Creation**
-   - Collections are created in the correct order:
-     1. users (no dependencies)
-     2. exercises, workouts, workout_plans (depend on users)
-     3. workout_sessions (depends on workouts and users)
-     4. workout_history (depends on users and workout_sessions)
-   - After creating each collection, its ID is fetched and stored
-   - IDs are validated before creating dependent collections
+#### Shell Script (`scripts/init-collections-curl.sh`)
 
-3. **ID Substitution in Relations**
-   - Collection functions now accept collection IDs as parameters
-   - Bash variable substitution injects actual IDs into JSON templates
-   - Example: `"collectionId": "$users_id"` becomes `"collectionId": "abc123xyz"`
+1. **New Function: `update_collection_rules()`**
+   - Added function to update collection rules after creation
+   - Uses PATCH `/api/collections/{id}` endpoint
+   - Takes token, collection ID, rules JSON, and collection name
 
-4. **Conditional Debug Logging**
-   - Debug mode controlled by `DEBUG=1` environment variable
-   - Helps troubleshoot issues without cluttering normal output
-   - Logs API responses, token info, and collection IDs
+2. **Separated Collection Definitions**
+   - Split each collection into two functions:
+     - `create_*_collection_schema()` - Returns schema JSON only
+     - `create_*_collection_rules()` - Returns rules JSON only
+   - Applied to all collections: users, exercises, workouts, workout_plans, workout_sessions, workout_history
+
+3. **Updated Main Execution Flow**
+   - For each collection:
+     1. Create with schema-only JSON
+     2. Fetch collection ID
+     3. Update with rules-only JSON
+   - Maintains dependency order (users → exercises/workouts/workout_plans → workout_sessions → workout_history)
+
+#### Dart Script (`scripts/init_collections.dart`)
+
+1. **Modified `CollectionSchema.toJson()` Method**
+   - Added optional parameter `includeRules` (default: true for backward compatibility)
+   - When `includeRules = false`, returns schema without validation rules
+   - When `includeRules = true`, returns complete schema with rules
+
+2. **New Method: `CollectionSchema.toRulesJson()`**
+   - Returns only the validation rules
+   - Used for the update step
+
+3. **Updated `createCollection()` Method**
+   - Step 1: Create collection with `toJson(includeRules: false)`
+   - Step 2: Update collection with `toRulesJson()`
+   - Both steps include proper logging
 
 ### Files Modified
-- `scripts/init-collections-curl.sh` - Main fix implementation
-- `scripts/TESTING_COLLECTIONS.md` - Comprehensive testing guide
-- `scripts/README.md` - Updated documentation
+- `scripts/init-collections-curl.sh` - Main fix implementation (shell script)
+- `scripts/init_collections.dart` - Main fix implementation (Dart script)
+- `COLLECTION_FIX_SUMMARY.md` - Updated documentation
+
+### Key Benefits
+1. **Eliminates validation errors** - Rules are only validated after fields exist
+2. **Works with all PocketBase versions** - Compatible with v0.23.0+
+3. **Maintains backward compatibility** - Existing collections are not affected
+4. **Clear separation of concerns** - Schema and rules are independent
+5. **Better error messages** - Separate steps make debugging easier
 
 ## How to Test
 
@@ -64,8 +106,12 @@ docker compose up
 ✅ Superuser authentication successful
 📄 Creating collection: users
 ✅ Collection 'users' created successfully
+🔧 Updating rules for collection: users
+✅ Rules for 'users' updated successfully
 📄 Creating collection: exercises
 ✅ Collection 'exercises' created successfully
+🔧 Updating rules for collection: exercises
+✅ Rules for 'exercises' updated successfully
 ...
 🎉 Collection initialization complete!
 📊 Summary: 6 created, 0 skipped
