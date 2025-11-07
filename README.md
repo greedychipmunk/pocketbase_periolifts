@@ -87,9 +87,12 @@ PocketBase will be available at http://localhost:8090
 
 **What happens automatically:**
 - ✅ PocketBase server starts
-- ✅ Database collections are created automatically (after superuser setup)
-- ✅ Proper security rules are configured
+- ✅ Database migrations are applied automatically
+- ✅ Collections and security rules are configured
+- ✅ Default exercise data is seeded
 - ✅ Ready for the Flutter app to connect
+
+> **Note**: On first startup, you'll need to create a superuser account at http://localhost:8090/_/ before the app can fully function.
 
 ### Prerequisites
 
@@ -163,7 +166,7 @@ The project includes a `docker-compose.yml` file that makes it easy to run Pocke
 
 **Initial Setup (PocketBase v0.23.0+):**
 
-PocketBase v0.23.0 requires a one-time superuser creation through the web UI:
+PocketBase uses automatic migrations to set up the database schema:
 
 1. Start PocketBase:
    ```bash
@@ -174,22 +177,17 @@ PocketBase v0.23.0 requires a one-time superuser creation through the web UI:
 
 3. Create a superuser account (this is your admin account)
 
-4. Update your `.env` file with the superuser credentials:
-   ```bash
-   POCKETBASE_ADMIN_EMAIL=your-superuser-email@example.com
-   POCKETBASE_ADMIN_PASSWORD=your-secure-password
-   ```
+4. **That's it!** Migrations run automatically and create all necessary collections:
+   - `users` - User accounts and profiles
+   - `exercises` - Exercise definitions (includes 10 default exercises)
+   - `workouts` - Workout templates
+   - `workout_plans` - Long-term planning
+   - `workout_sessions` - Individual workout executions  
+   - `workout_history` - Performance tracking
 
-5. Restart the initialization container to create collections:
-   ```bash
-   docker compose restart pocketbase-init
-   ```
-
-6. Verify collections were created:
-   ```bash
-   docker compose logs pocketbase-init
-   # You should see: "Collection initialization complete!"
-   ```
+5. Verify in the admin UI:
+   - Go to **Collections** tab
+   - You should see all 6 collections with proper schemas
 
 **Commands:**
 ```bash
@@ -238,41 +236,76 @@ The application requires several PocketBase collections:
 - `workout_history` - Historical workout data
 
 > [!NOTE]
-> Collections are automatically created by the `pocketbase-init` container after you complete the initial superuser setup.
-> The collection schemas are defined in `/scripts/init-collections-curl.sh`.
+> Collections are automatically created by PocketBase migrations when the server starts.
+> The collection schemas are defined in migration files in the `/pb_migrations/` directory.
 
 ### Troubleshooting
 
-#### PocketBase v0.23.0 Authentication Issues
+#### Migration Issues
 
-**Error: "The request requires valid record authorization token" (401)**
+**Automatic Migration System:**
 
-This error occurs when the initialization script cannot authenticate. This is typically because:
+This project uses PocketBase's standard migration system for automatic database schema management. All schema changes are version-controlled and applied automatically on startup.
 
-1. **Superuser not created yet**: Visit http://localhost:8090/_/ to create your superuser account
-2. **Wrong credentials in .env**: Ensure `POCKETBASE_ADMIN_EMAIL` and `POCKETBASE_ADMIN_PASSWORD` match your superuser account
-3. **Case sensitivity**: Email addresses are case-sensitive in PocketBase
+**If migrations aren't applying:**
 
-**Solution:**
-```bash
-# 1. Stop containers
-docker compose down
+1. **Check migration logs:**
+   ```bash
+   docker compose logs pocketbase
+   ```
 
-# 2. Visit http://localhost:8090/_/ and create superuser (if not done)
-docker compose up -d pocketbase
-# Open browser to http://localhost:8090/_/
+2. **Verify superuser created:** Visit http://localhost:8090/_/ to create/verify admin account (required for first-time setup)
 
-# 3. Update .env with correct credentials
-nano .env  # or use your preferred editor
+3. **Check migration status in admin UI:**
+   - Go to **Settings > Migrations** - should see 7 applied migrations
+   - Verify migration history shows successful execution
 
-# 4. Restart initialization
-docker compose up pocketbase-init
+4. **Expected collections after successful migration:**
+   - `users` (auth collection) - User accounts and profiles
+   - `exercises` - Exercise definitions (includes 10 default exercises)
+   - `workouts` - Workout templates
+   - `workout_plans` - Long-term planning
+   - `workout_sessions` - Individual workout executions  
+   - `workout_history` - Performance tracking
 
-# 5. Check logs
-docker compose logs pocketbase-init
-```
+5. **Reset database (development only):**
+   ```bash
+   # Stop containers and remove volumes
+   docker compose down -v
+   
+   # Remove all data (CAUTION: This deletes everything!)
+   sudo rm -rf pocketbase/pb_data/*
+   
+   # Start fresh - migrations will run automatically
+   docker compose up
+   ```
 
-**Note:** In PocketBase v0.23.0+, the admin API endpoints were removed. Admins are now `_superusers` auth collection records and must be created through the web UI.
+**Migration file locations:**
+All migration files are in `pb_migrations/` directory and execute automatically. See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) for detailed migration system documentation.
+
+**Legacy cleanup note:** The previous custom initialization scripts (`scripts/init_collections.dart`, `scripts/init-collections-curl.sh`) are no longer used and can be safely ignored.
+
+### Database Schema & Migrations
+
+This project uses **PocketBase migrations** for automatic database schema management. All schema changes are version-controlled and applied automatically.
+
+**Migration files** (in `pb_migrations/`):
+- `1732713600_create_users.js` - User authentication and profiles
+- `1732713601_create_exercises.js` - Exercise definitions  
+- `1732713602_create_workouts.js` - Workout templates
+- `1732713603_create_workout_plans.js` - Long-term planning
+- `1732713604_create_workout_sessions.js` - Session tracking
+- `1732713605_create_workout_history.js` - Performance history
+- `1732713606_seed_default_exercises.js` - Default exercise data
+
+**Benefits of migrations:**
+- ✅ **Automatic execution** on PocketBase startup
+- ✅ **Version controlled** schema changes
+- ✅ **Team synchronization** - everyone gets the same schema
+- ✅ **Production ready** - safe for deployments
+- ✅ **Rollback support** with down migrations
+
+**For developers:** See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) for detailed information about creating and managing migrations.
 
 #### Docker Compose Issues
 

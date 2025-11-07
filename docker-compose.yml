@@ -8,41 +8,22 @@ services:
     volumes:
       # Mount pb_data directory to persist database and files
       - ./pocketbase/pb_data:/pb_data
+      # Mount migrations directory
+      - ./pb_migrations:/pb_migrations
     environment:
       # PocketBase will serve on this address
       - PB_HOST=0.0.0.0
     command: 
       - serve
       - --http=0.0.0.0:8090
+      # Automatically apply migrations on startup
+      - --migrationsDir=/pb_migrations
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8090/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  pocketbase-init:
-    image: alpine:latest
-    container_name: periolifts_pocketbase_init
-    depends_on:
-      pocketbase:
-        condition: service_healthy
-    volumes:
-      - ./scripts:/scripts
-      - ./pocketbase/pb_data:/pb_data
-    environment:
-      - POCKETBASE_HOST=pocketbase
-      - POCKETBASE_PORT=8090
-      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL:-admin@example.com}
-      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD:-password}
-    command: >
-      sh -c "
-      echo 'Installing curl...' &&
-      apk add --no-cache curl &&
-      echo 'Running collection initialization...' &&
-      sh /scripts/init-collections-curl.sh
-      "
-    restart: "no"
 
 networks:
   default:

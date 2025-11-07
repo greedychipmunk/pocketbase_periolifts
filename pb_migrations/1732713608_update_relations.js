@@ -1,0 +1,75 @@
+/// <reference path="../pb_data/types.d.ts" />
+
+migrate((app) => {
+  // Update exercises collection to properly reference users
+  const exercisesCollection = app.findCollectionByNameOrId("exercises")
+  const usersCollection = app.findCollectionByNameOrId("users")
+  
+  // Find the user_id relation field and update its collectionId
+  const userIdField = exercisesCollection.fields.find(field => field.name === "user_id")
+  if (userIdField && userIdField.options) {
+    userIdField.options.collectionId = usersCollection.id
+    userIdField.options.displayFields = ["name"]
+  }
+  
+  // Update other collections with user relations as needed
+  const workoutsCollection = app.findCollectionByNameOrId("workouts")
+  const workoutUserField = workoutsCollection.fields.find(field => field.name === "user_id")
+  if (workoutUserField && workoutUserField.options) {
+    workoutUserField.options.collectionId = usersCollection.id
+    workoutUserField.options.displayFields = ["name"]
+  }
+
+  const workoutPlansCollection = app.findCollectionByNameOrId("workout_plans")
+  const planUserField = workoutPlansCollection.fields.find(field => field.name === "user_id")
+  if (planUserField && planUserField.options) {
+    planUserField.options.collectionId = usersCollection.id
+    planUserField.options.displayFields = ["name"]
+  }
+
+  const workoutSessionsCollection = app.findCollectionByNameOrId("workout_sessions")
+  const sessionUserField = workoutSessionsCollection.fields.find(field => field.name === "user_id")
+  if (sessionUserField && sessionUserField.options) {
+    sessionUserField.options.collectionId = usersCollection.id
+    sessionUserField.options.displayFields = ["name"]
+  }
+
+  const workoutHistoryCollection = app.findCollectionByNameOrId("workout_history")
+  const historyUserField = workoutHistoryCollection.fields.find(field => field.name === "user_id")
+  if (historyUserField && historyUserField.options) {
+    historyUserField.options.collectionId = usersCollection.id
+    historyUserField.options.displayFields = ["name"]
+  }
+
+  // Save all updated collections
+  app.save(exercisesCollection)
+  app.save(workoutsCollection)
+  app.save(workoutPlansCollection)
+  app.save(workoutSessionsCollection)
+  app.save(workoutHistoryCollection)
+
+  return null
+}, (app) => {
+  // Down migration - reset collection IDs to empty
+  try {
+    const collections = ["exercises", "workouts", "workout_plans", "workout_sessions", "workout_history"]
+    
+    collections.forEach(collectionName => {
+      try {
+        const collection = app.findCollectionByNameOrId(collectionName)
+        const userIdField = collection.fields.find(field => field.name === "user_id")
+        if (userIdField && userIdField.options) {
+          userIdField.options.collectionId = ""
+          userIdField.options.displayFields = ["id"]
+        }
+        app.save(collection)
+      } catch (e) {
+        // Collection might not exist, skip
+      }
+    })
+  } catch (e) {
+    // Ignore errors in down migration
+  }
+  
+  return null
+})

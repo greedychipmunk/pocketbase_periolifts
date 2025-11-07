@@ -1,0 +1,65 @@
+/// <reference path="../pb_data/types.d.ts" />
+
+migrate((app) => {
+  const collection = new Collection({
+    "id": "",
+    "name": "workout_plans",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "options": {}
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "required": true,
+        "options": {}
+      },
+      {
+        "name": "start_date",
+        "type": "date",
+        "required": true,
+        "options": {}
+      },
+      {
+        "name": "schedule",
+        "type": "json",
+        "required": true,
+        "options": {}
+      },
+      {
+        "name": "is_active",
+        "type": "bool",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "user_id",
+        "type": "relation",
+        "required": true,
+        "options": {
+          "collectionId": "users",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": ["name"]
+        }
+      }
+    ],
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "",
+    "updateRule": "",
+    "deleteRule": ""
+  })
+
+  return app.save(collection)
+}, (app) => {
+  // Down migration - remove workout_plans collection
+  const collection = app.findCollectionByNameOrId("workout_plans")
+  return app.delete(collection)
+})
