@@ -100,7 +100,7 @@ migrate((app) => {
         "id": "bool1579384332",
         "name": "is_custom",
         "presentable": false,
-        "required": true,
+        "required": false,
         "system": false,
         "type": "bool"
       },
