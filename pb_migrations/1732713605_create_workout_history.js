@@ -6,91 +6,184 @@ migrate((app) => {
     "name": "workout_history",
     "type": "base",
     "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384326",
+        "max": 255,
+        "min": 0,
         "name": "user_id",
-        "type": "relation",
-        "required": true,
-        "options": {
-          "collectionId": "users",
-          "cascadeDelete": false,
-          "minSelect": null,
-          "maxSelect": 1,
-          "displayFields": ["name"]
-        }
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384327",
+        "max": 255,
+        "min": 0,
         "name": "workout_session_id",
-        "type": "relation",
-        "required": true,
-        "options": {
-          "collectionId": "workout_sessions",
-          "cascadeDelete": false,
-          "minSelect": null,
-          "maxSelect": 1,
-          "displayFields": []
-        }
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384328",
+        "max": 255,
+        "min": 0,
         "name": "workout_name",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "hidden": false,
+        "id": "date1579384329",
+        "max": "",
+        "min": "",
         "name": "completed_at",
-        "type": "date",
+        "presentable": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "date"
       },
       {
+        "hidden": false,
+        "id": "number1579384330",
+        "max": null,
+        "min": null,
         "name": "duration",
-        "type": "number",
+        "noDecimal": false,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "number"
       },
       {
+        "hidden": false,
+        "id": "number1579384331",
+        "max": null,
+        "min": null,
         "name": "exercises_completed",
-        "type": "number",
+        "noDecimal": true,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "number"
       },
       {
+        "hidden": false,
+        "id": "number1579384332",
+        "max": null,
+        "min": null,
         "name": "total_sets",
-        "type": "number",
+        "noDecimal": true,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "number"
       },
       {
+        "hidden": false,
+        "id": "number1579384333",
+        "max": null,
+        "min": null,
         "name": "total_reps",
-        "type": "number",
+        "noDecimal": true,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "number"
       },
       {
+        "hidden": false,
+        "id": "number1579384334",
+        "max": null,
+        "min": null,
         "name": "total_weight",
-        "type": "number",
+        "noDecimal": false,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "number"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384335",
+        "max": 2000,
+        "min": 0,
         "name": "notes",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "hidden": false,
+        "id": "json1579384336",
+        "maxSize": 2000000,
         "name": "performance_data",
-        "type": "json",
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "json"
+      },
+      {
+        "hidden": false,
+        "id": "autodate2990389176",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate3332085495",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
       }
     ],
-    "listRule": "",
-    "viewRule": "",
-    "createRule": "",
-    "updateRule": "",
-    "deleteRule": ""
+    "listRule": "user_id = @request.auth.id",
+    "viewRule": "user_id = @request.auth.id",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "user_id = @request.auth.id",
+    "deleteRule": "user_id = @request.auth.id"
   })
 
   return app.save(collection)
