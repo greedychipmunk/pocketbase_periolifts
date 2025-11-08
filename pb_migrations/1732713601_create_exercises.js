@@ -6,60 +6,123 @@ migrate((app) => {
     "name": "exercises",
     "type": "base",
     "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384326",
+        "max": 255,
+        "min": 0,
         "name": "name",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384327",
+        "max": 255,
+        "min": 0,
         "name": "category",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384328",
+        "max": 2000,
+        "min": 0,
         "name": "description",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "hidden": false,
+        "id": "json1579384329",
+        "maxSize": 2000000,
         "name": "muscle_groups",
-        "type": "json",
+        "presentable": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "json"
       },
       {
+        "exceptDomains": null,
+        "hidden": false,
+        "id": "url1579384330",
         "name": "image_url",
-        "type": "url",
+        "onlyDomains": null,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "url"
       },
       {
+        "exceptDomains": null,
+        "hidden": false,
+        "id": "url1579384331",
         "name": "video_url",
-        "type": "url",
+        "onlyDomains": null,
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "url"
       },
       {
+        "hidden": false,
+        "id": "bool1579384332",
         "name": "is_custom",
-        "type": "bool",
+        "presentable": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "bool"
       },
       {
-        "name": "user_id",
-        "type": "relation",
-        "required": false,
-        "options": {
-          "collectionId": "",
-          "cascadeDelete": false,
-          "minSelect": null,
-          "maxSelect": 1,
-          "displayFields": ["id"]
-        }
+        "hidden": false,
+        "id": "autodate2990389176",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate3332085495",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
       }
     ],
     "listRule": "",

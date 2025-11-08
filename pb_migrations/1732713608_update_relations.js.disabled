@@ -5,12 +5,21 @@ migrate((app) => {
   const exercisesCollection = app.findCollectionByNameOrId("exercises")
   const usersCollection = app.findCollectionByNameOrId("users")
   
-  // Find the user_id relation field and update its collectionId
-  const userIdField = exercisesCollection.fields.find(field => field.name === "user_id")
-  if (userIdField && userIdField.options) {
-    userIdField.options.collectionId = usersCollection.id
-    userIdField.options.displayFields = ["name"]
-  }
+  // Add user_id relation field to exercises collection
+  exercisesCollection.fields.push({
+    "cascadeDelete": false,
+    "collectionId": usersCollection.id,
+    "displayFields": ["name"],
+    "hidden": false,
+    "id": "relation" + Date.now(),
+    "maxSelect": 1,
+    "minSelect": null,
+    "name": "user_id",
+    "presentable": false,
+    "required": false,
+    "system": false,
+    "type": "relation"
+  })
   
   // Update other collections with user relations as needed
   const workoutsCollection = app.findCollectionByNameOrId("workouts")
