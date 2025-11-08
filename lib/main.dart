@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider;
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/workout_providers.dart';
 import 'providers/workout_session_providers.dart';
+import 'providers/theme_provider.dart';
+import 'providers/units_provider.dart';
+import 'providers/rest_time_settings_provider.dart';
 import 'config/theme_config.dart';
 import 'constants/app_constants.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const ProviderScope(child: PerioLiftsApp()));
+  runApp(
+    provider.MultiProvider(
+      providers: [
+        provider.ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        provider.ChangeNotifierProvider(create: (_) => UnitsProvider()),
+        provider.ChangeNotifierProvider(create: (_) => RestTimeSettingsProvider()),
+      ],
+      child: const ProviderScope(child: PerioLiftsApp()),
+    ),
+  );
 }
 
 class PerioLiftsApp extends ConsumerWidget {
