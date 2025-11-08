@@ -6,55 +6,119 @@ migrate((app) => {
     "name": "workout_plans",
     "type": "base",
     "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384326",
+        "max": 255,
+        "min": 0,
         "name": "name",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384327",
+        "max": 2000,
+        "min": 0,
         "name": "description",
-        "type": "text",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "text"
       },
       {
+        "hidden": false,
+        "id": "date1579384328",
+        "max": "",
+        "min": "",
         "name": "start_date",
-        "type": "date",
+        "presentable": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "date"
       },
       {
+        "hidden": false,
+        "id": "json1579384329",
+        "maxSize": 2000000,
         "name": "schedule",
-        "type": "json",
+        "presentable": false,
         "required": true,
-        "options": {}
+        "system": false,
+        "type": "json"
       },
       {
+        "hidden": false,
+        "id": "bool1579384330",
         "name": "is_active",
-        "type": "bool",
+        "presentable": false,
         "required": false,
-        "options": {}
+        "system": false,
+        "type": "bool"
       },
       {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text1579384331",
+        "max": 255,
+        "min": 0,
         "name": "user_id",
-        "type": "relation",
-        "required": true,
-        "options": {
-          "collectionId": "users",
-          "cascadeDelete": false,
-          "minSelect": null,
-          "maxSelect": 1,
-          "displayFields": ["name"]
-        }
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "hidden": false,
+        "id": "autodate2990389176",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate3332085495",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
       }
     ],
-    "listRule": "",
-    "viewRule": "",
-    "createRule": "",
-    "updateRule": "",
-    "deleteRule": ""
+    "listRule": "user_id = @request.auth.id",
+    "viewRule": "user_id = @request.auth.id",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "user_id = @request.auth.id",
+    "deleteRule": "user_id = @request.auth.id"
   })
 
   return app.save(collection)
