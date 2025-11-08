@@ -10,86 +10,81 @@ migrate((app) => {
       "category": "strength",
       "description": "A bodyweight exercise that targets chest, shoulders, and triceps",
       "muscle_groups": ["chest", "triceps", "shoulders"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Squats",
       "category": "strength", 
       "description": "A compound exercise that targets quadriceps, glutes, and hamstrings",
       "muscle_groups": ["quadriceps", "glutes", "hamstrings"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Plank",
       "category": "core",
       "description": "An isometric core strengthening exercise",
       "muscle_groups": ["core", "shoulders"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Lunges",
       "category": "strength",
       "description": "A unilateral leg exercise targeting quadriceps, glutes, and stabilizers",
       "muscle_groups": ["quadriceps", "glutes", "hamstrings", "calves"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Burpees",
       "category": "cardio",
       "description": "A full-body exercise combining squat, push-up, and jump",
       "muscle_groups": ["full_body"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Mountain Climbers",
       "category": "cardio",
       "description": "A dynamic exercise that combines cardio and core strengthening",
       "muscle_groups": ["core", "shoulders", "legs"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Jumping Jacks",
       "category": "cardio",
       "description": "A simple cardiovascular exercise",
       "muscle_groups": ["full_body"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Bicycle Crunches",
       "category": "core",
       "description": "A core exercise targeting the obliques and rectus abdominis",
       "muscle_groups": ["core", "obliques"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "Wall Sit",
       "category": "strength",
       "description": "An isometric exercise targeting quadriceps and glutes",
       "muscle_groups": ["quadriceps", "glutes"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     },
     {
       "name": "High Knees",
       "category": "cardio",
       "description": "A cardio exercise that improves coordination and leg strength",
       "muscle_groups": ["legs", "core"],
-      "is_custom": false,
-      "user_id": null
+      "is_custom": false
     }
   ]
 
   // Create records for each default exercise
   defaultExercises.forEach(exerciseData => {
-    const record = new Record(collection, exerciseData)
+    const record = new Record(collection)
+    record.set("name", exerciseData.name)
+    record.set("category", exerciseData.category)
+    record.set("description", exerciseData.description)
+    record.set("muscle_groups", exerciseData.muscle_groups)
+    record.set("is_custom", exerciseData.is_custom)
     app.save(record)
   })
 
@@ -97,7 +92,7 @@ migrate((app) => {
 }, (app) => {
   // Down migration - remove default exercises
   const collection = app.findCollectionByNameOrId("exercises")
-  const records = app.findRecordsByFilter(collection.id, "is_custom = false && user_id = null")
+  const records = app.findRecordsByFilter(collection.id, "is_custom = false")
   
   records.forEach(record => {
     app.delete(record)
