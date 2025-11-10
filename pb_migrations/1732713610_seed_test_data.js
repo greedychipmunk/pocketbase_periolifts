@@ -43,7 +43,7 @@ migrate((app) => {
     exercise.set("category", exerciseData.category)
     exercise.set("description", exerciseData.description)
     exercise.set("muscle_groups", exerciseData.muscle_groups)
-    // Don't set is_custom since it's now optional and will default
+    exercise.set("is_custom", false)
     app.save(exercise)
   })
 
