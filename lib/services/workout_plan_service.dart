@@ -301,6 +301,58 @@ class WorkoutPlanService extends BasePocketBaseService {
     return getWorkoutPlans(activeOnly: true);
   }
 
+  /// Check if user has active programs with future scheduled workouts
+  ///
+  /// Returns Result<bool> indicating if user has active programs with future workouts
+  /// A user has active programs if they have at least one workout_plan with:
+  /// - user_id matching the authenticated user
+  /// - is_active = true
+  /// - at least one workout scheduled for a future date
+  Future<Result<bool>> hasActiveProgramsWithFutureWorkouts() async {
+    try {
+      if (!isAuthenticated) {
+        return Result.error(
+          AppError.authentication(message: 'Authentication required'),
+        );
+      }
+
+      // Get all active plans for the user
+      final plansResult = await getActivePlans();
+      if (plansResult.isError) {
+        return Result.error((plansResult as Error).error);
+      }
+
+      final activePlans = (plansResult as Success<List<WorkoutPlan>>).data;
+
+      // Check if any active plan has future workouts
+      final today = DateTime.now();
+      final todayString = _formatDateKey(today);
+
+      for (final plan in activePlans) {
+        // Check each scheduled date in the plan
+        for (final dateString in plan.schedule.keys) {
+          // Compare date strings to check if date is in the future
+          if (dateString.compareTo(todayString) > 0) {
+            // Found a future workout
+            return Result.success(true);
+          }
+        }
+      }
+
+      // No active plans with future workouts found
+      return Result.success(false);
+    } catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    }
+  }
+
+  /// Format date as string key for schedule map (YYYY-MM-DD)
+  String _formatDateKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
   /// Get workout plans scheduled for a specific date
   ///
   /// [date] The date to check for scheduled workouts
