@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/programs_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/workout_providers.dart';
 import 'providers/workout_session_providers.dart';
+import 'providers/workout_plan_providers.dart';
 import 'providers/theme_provider.dart';
 import 'providers/units_provider.dart';
 import 'providers/rest_time_settings_provider.dart';
@@ -55,18 +57,55 @@ class PerioLiftsApp extends ConsumerWidget {
       final workoutService = ref.read(workoutServiceProvider);
       final workoutSessionService = ref.read(workoutSessionServiceProvider);
       final authService = ref.read(authServiceProvider);
+      final workoutPlanService = ref.read(workoutPlanServiceProvider);
 
-      return DashboardScreen(
-        workoutService: workoutService,
-        workoutSessionService: workoutSessionService,
-        authService: authService,
-        onAuthError: () => _handleSignOut(ref),
-        onLogout: () => _handleSignOut(ref),
+      // Check if user has active programs with future workouts
+      return FutureBuilder<bool>(
+        future: _checkActiveProgramsWithFutureWorkouts(workoutPlanService),
+        builder: (context, snapshot) {
+          // Show loading while checking for active programs
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          // If there's an error or user has no active programs with future workouts,
+          // redirect to Programs screen
+          if (snapshot.hasError || snapshot.data == false) {
+            return ProgramsScreen(
+              workoutService: workoutService,
+              authService: authService,
+              onAuthError: () => _handleSignOut(ref),
+            );
+          }
+
+          // User has active programs, show dashboard
+          return DashboardScreen(
+            workoutService: workoutService,
+            workoutSessionService: workoutSessionService,
+            authService: authService,
+            onAuthError: () => _handleSignOut(ref),
+            onLogout: () => _handleSignOut(ref),
+          );
+        },
       );
     }
 
     // Show login screen if not authenticated
     return const LoginScreen();
+  }
+
+  Future<bool> _checkActiveProgramsWithFutureWorkouts(
+    dynamic workoutPlanService,
+  ) async {
+    final result =
+        await workoutPlanService.hasActiveProgramsWithFutureWorkouts();
+    if (result.isSuccess) {
+      return result.data as bool;
+    }
+    // On error, default to false to redirect to Programs screen
+    return false;
   }
 
   Future<void> _handleSignOut(WidgetRef ref) async {
