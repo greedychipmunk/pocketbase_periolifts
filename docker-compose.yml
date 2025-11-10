@@ -13,6 +13,9 @@ services:
     environment:
       # PocketBase will serve on this address
       - PB_HOST=0.0.0.0
+      # Test user credentials for migrations
+      - PB_TEST_EMAIL=${PB_TEST_EMAIL:-test@example.com}
+      - PB_TEST_PASSWORD=${PB_TEST_PASSWORD:-test_password_123}
     command: 
       - serve
       - --http=0.0.0.0:8090
