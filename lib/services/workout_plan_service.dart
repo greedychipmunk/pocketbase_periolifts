@@ -125,16 +125,24 @@ class WorkoutPlanService extends BasePocketBaseService {
         );
       }
 
-      String? filter;
-      if (checkOwnership && isAuthenticated) {
-        filter = createUserFilter(userField: 'user_id');
-      }
-
       final record = await pb
           .collection(_collection)
-          .getOne(id, filter: filter);
+          .getOne(id);
 
       final plan = WorkoutPlan.fromJson(record.toJson());
+
+      // Verify ownership if required
+      if (checkOwnership && isAuthenticated) {
+        if (plan.userId != currentUserId) {
+          return Result.error(
+            AppError.permission(
+              message: 'You do not have permission to access this workout plan',
+              details: {'planId': id},
+            ),
+          );
+        }
+      }
+
       return Result.success(plan);
     } on ClientException catch (e) {
       return Result.error(ErrorHandler.handlePocketBaseError(e));
@@ -366,19 +374,17 @@ class WorkoutPlanService extends BasePocketBaseService {
         );
       }
 
-      final dateString = WorkoutPlan._formatDateKey(date);
-
       // Get all active plans for the user
       final plansResult = await getActivePlans();
       if (plansResult.isError) {
         return Result.error((plansResult as Error).error);
       }
 
-      final allPlans = (plansResult as Success).data;
+      final allPlans = (plansResult as Success<List<WorkoutPlan>>).data;
 
       // Filter plans that have workouts on the specified date
       final plansForDate = allPlans
-          .where((plan) => plan.getWorkoutsForDate(date).isNotEmpty)
+          .where((WorkoutPlan plan) => plan.getWorkoutsForDate(date).isNotEmpty)
           .toList();
 
       return Result.success(plansForDate);
