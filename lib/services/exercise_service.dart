@@ -157,6 +157,30 @@ class ExerciseService extends BasePocketBaseService {
     }
   }
 
+  // Batch load exercises to prevent N+1 queries
+  Future<Result<Map<String, Exercise>>> getExercisesBatch(
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) return Result.success({});
+
+    try {
+      final filter = 'id in (${ids.map((id) => '"$id"').join(',')})';
+      final result = await pb
+          .collection('exercises')
+          .getList(page: 1, perPage: ids.length, filter: filter);
+
+      final exerciseMap = <String, Exercise>{};
+      for (final record in result.items) {
+        final exercise = Exercise.fromJson(record.toJson());
+        exerciseMap[exercise.id] = exercise;
+      }
+
+      return Result.success(exerciseMap);
+    } catch (e) {
+      return Result.error(ErrorHandler.handlePocketBaseError(e));
+    }
+  }
+
   /// Get a specific exercise by ID
   ///
   /// [exerciseId] The unique identifier of the exercise
