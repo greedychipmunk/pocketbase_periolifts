@@ -52,8 +52,12 @@ app.*.map.json
 .env.test
 
 # PocketBase data (if running locally)
-pocketbase/
+pocketbase/pb_data/
+pocketbase/pocketbase
 pb_data/
+
+# Keep migrations in version control
+!pocketbase/pb_migrations/
 
 # Scripts dependencies
 scripts/.dart_tool/
