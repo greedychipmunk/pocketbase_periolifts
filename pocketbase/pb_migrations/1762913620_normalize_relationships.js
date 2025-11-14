@@ -16,109 +16,147 @@
 
 migrate(
   (app) => {
+    // Get the workout_plans collection to reference its ID
+    const workoutPlansCollection = app.findCollectionByNameOrId("workout_plans");
+    if (!workoutPlansCollection) {
+      throw new Error("workout_plans collection not found");
+    }
+
     // Create the calendar-optimized workout_plan_schedules collection
     const collection = new Collection({
-      id: "workout_plan_schedules",
+      id: "",
       name: "workout_plan_schedules",
       type: "base",
       system: false,
 
-      schema: [
+      fields: [
         {
-          id: "plan_id",
+          autogeneratePattern: "[a-z0-9]{15}",
+          hidden: false,
+          id: "text3208210256",
+          max: 15,
+          min: 15,
+          name: "id",
+          pattern: "^[a-z0-9]+$",
+          presentable: false,
+          primaryKey: true,
+          required: true,
+          system: true,
+          type: "text"
+        },
+        {
+          cascadeDelete: true,
+          collectionId: workoutPlansCollection.id,
+          displayFields: ["name"],
+          hidden: false,
+          id: "relation1579384326",
+          maxSelect: 1,
+          minSelect: null,
           name: "plan_id",
-          type: "relation",
-          required: true,
           presentable: false,
-          unique: false,
-          options: {
-            collectionId: "workout_plans",
-            cascadeDelete: true,
-            minSelect: null,
-            maxSelect: 1,
-            displayFields: ["name"],
-          },
+          required: true,
+          system: false,
+          type: "relation"
         },
         {
-          id: "workout_id",
+          autogeneratePattern: "",
+          hidden: false,
+          id: "text1579384327",
+          max: 255,
+          min: 1,
           name: "workout_id",
-          type: "text",
-          required: true,
+          pattern: "",
           presentable: false,
-          unique: false,
-          options: {
-            min: 1,
-            max: 255,
-            pattern: "",
-          },
+          primaryKey: false,
+          required: true,
+          system: false,
+          type: "text"
         },
         {
-          id: "scheduled_date",
+          hidden: false,
+          id: "date1579384328",
+          max: "",
+          min: "",
           name: "scheduled_date",
-          type: "date",
-          required: true,
           presentable: true,
-          unique: false,
-          options: {
-            min: "",
-            max: "",
-          },
-        },
-        {
-          id: "day_of_week",
-          name: "day_of_week",
-          type: "select",
           required: true,
-          presentable: false,
-          unique: false,
-          options: {
-            maxSelect: 1,
-            values: [
-              "monday",
-              "tuesday",
-              "wednesday",
-              "thursday",
-              "friday",
-              "saturday",
-              "sunday",
-            ],
-          },
+          system: false,
+          type: "date"
         },
         {
-          id: "sort_order",
+          hidden: false,
+          id: "select1579384329",
+          maxSelect: 1,
+          name: "day_of_week",
+          presentable: false,
+          required: true,
+          system: false,
+          type: "select",
+          values: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday"
+          ]
+        },
+        {
+          hidden: false,
+          id: "number1579384330",
+          max: null,
+          min: 0,
           name: "sort_order",
-          type: "number",
-          required: false,
+          noDecimal: true,
           presentable: false,
-          unique: false,
-          options: {
-            min: 0,
-            max: null,
-            noDecimal: true,
-          },
+          required: false,
+          system: false,
+          type: "number"
         },
         {
-          id: "is_rest_day",
+          hidden: false,
+          id: "bool1579384331",
           name: "is_rest_day",
-          type: "bool",
-          required: false,
           presentable: false,
-          unique: false,
-          options: {},
+          required: false,
+          system: false,
+          type: "bool"
         },
         {
-          id: "notes",
+          autogeneratePattern: "",
+          hidden: false,
+          id: "text1579384332",
+          max: 1000,
+          min: null,
           name: "notes",
-          type: "text",
-          required: false,
+          pattern: "",
           presentable: false,
-          unique: false,
-          options: {
-            min: null,
-            max: 1000,
-            pattern: "",
-          },
+          primaryKey: false,
+          required: false,
+          system: false,
+          type: "text"
         },
+        {
+          hidden: false,
+          id: "autodate2990389176",
+          name: "created",
+          onCreate: true,
+          onUpdate: false,
+          presentable: false,
+          system: false,
+          type: "autodate"
+        },
+        {
+          hidden: false,
+          id: "autodate3332085495",
+          name: "updated",
+          onCreate: true,
+          onUpdate: true,
+          presentable: false,
+          system: false,
+          type: "autodate"
+        }
       ],
 
       indexes: [
