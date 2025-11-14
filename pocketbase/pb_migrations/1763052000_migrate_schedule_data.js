@@ -135,15 +135,14 @@ migrate(
                 const isRestDay = workoutId.toLowerCase().includes("rest");
 
                 // Create new schedule record
-                const scheduleRecord = new Record(schedulesCollection, {
-                  plan_id: plan.id,
-                  workout_id: workoutId,
-                  scheduled_date: dateStr,
-                  day_of_week: dayOfWeek,
-                  sort_order: i,
-                  is_rest_day: isRestDay,
-                  notes: "",
-                });
+                const scheduleRecord = new Record(schedulesCollection);
+                scheduleRecord.set("plan_id", plan.id);
+                scheduleRecord.set("workout_id", workoutId);
+                scheduleRecord.set("scheduled_date", dateStr);
+                scheduleRecord.set("day_of_week", dayOfWeek);
+                scheduleRecord.set("sort_order", i);
+                scheduleRecord.set("is_rest_day", isRestDay);
+                scheduleRecord.set("notes", "");
 
                 app.save(scheduleRecord);
                 migratedCount++;

@@ -74,7 +74,7 @@ class CalendarEvent extends BasePocketBaseModel {
         created: baseFields['created'] as DateTime,
         updated: baseFields['updated'] as DateTime,
         planId: json['plan_id']?.toString() ?? '',
-        workoutId: json['workoutId']?.toString() ?? '',
+        workoutId: json['workout_id']?.toString() ?? '',
         scheduledDate: json['scheduled_date'] != null
             ? DateTime.parse(json['scheduled_date'].toString())
             : DateTime.now(),
