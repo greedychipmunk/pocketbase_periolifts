@@ -1,9 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Skip this migration - depends on workout_history table that doesn't exist yet
+// No-op migration - workout stats are calculated on-demand from workout_history
+// View-based aggregations are not needed as the app handles stats client-side
 migrate((app) => {
-  console.log("Skipping workout_stats_view migration - depends on missing tables")
-  return null
+  // No changes needed - stats are computed in the application layer
 }, (app) => {
-  return null  
+  // No rollback needed
 })
