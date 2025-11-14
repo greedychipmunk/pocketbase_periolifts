@@ -1,27 +1,21 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate(
   (app) => {
-    // add up queries...
+    // Add validation rule to prevent workouts without exercises
     const workouts = app.findCollectionByNameOrId("workouts");
 
-    // Add validation rule to prevent workouts without exercises
     workouts.createRule = `
     @request.auth.id != "" && 
     @request.data.exercises != null &&
     @request.data.exercises != "[]"
   `;
 
-    // Add cascade delete for workout_exercises when workout is deleted
-    workouts.afterDelete = `
-    // Delete associated workout_exercises records
-    const workoutExercises = $app.findRecordsByFilter(
-      "workout_exercises", 
-      \`workout = "\${record.id}"\`
-    );
-    workoutExercises.forEach(we => $app.deleteRecord(we));
-  `;
+    // Note: Cascade delete not needed for workout_exercises collection
+    // as exercises are stored as JSON within the workout record itself
   },
   (app) => {
-    // add down queries...
+    // Rollback: Remove validation rule
+    const workouts = app.findCollectionByNameOrId("workouts");
+    workouts.createRule = `@request.auth.id != ""`;
   }
 );

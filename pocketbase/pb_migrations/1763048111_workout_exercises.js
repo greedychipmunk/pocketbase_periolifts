@@ -1,9 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Skip this migration - problematic relation references
+// No-op migration - workout exercises are stored as JSON in the workouts collection
+// This collection is not needed as exercises are embedded in workout records
 migrate((app) => {
-  console.log("Skipping workout_exercises migration - will be recreated later")
-  return null
+  // No changes needed - exercises are stored as JSON fields in workouts
 }, (app) => {
-  return null  
+  // No rollback needed
 })
