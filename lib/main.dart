@@ -36,12 +36,16 @@ class PerioLiftsApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
 
-    return MaterialApp(
-      title: AppConstants.appName,
-      theme: LightThemeConfig.themeData(),
-      darkTheme: DarkThemeConfig.themeData(),
-      themeMode: ThemeMode.system,
-      home: _buildHomeScreen(authState, ref),
+    return provider.Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: AppConstants.appName,
+          theme: LightThemeConfig.themeData(),
+          darkTheme: DarkThemeConfig.themeData(),
+          themeMode: themeProvider.themeMode,
+          home: _buildHomeScreen(authState, ref),
+        );
+      },
     );
   }
 
