@@ -1,0 +1,89 @@
+/// <reference path="../pb_data/types.d.ts" />
+
+migrate((app) => {
+  const collection = new Collection({
+    "id": "",
+    "name": "workouts",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "options": {}
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "estimated_duration",
+        "type": "number",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "exercises",
+        "type": "json",
+        "required": true,
+        "options": {}
+      },
+      {
+        "name": "user_id",
+        "type": "relation",
+        "required": true,
+        "options": {
+          "collectionId": "users",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": ["name"]
+        }
+      },
+      {
+        "name": "scheduled_date",
+        "type": "date",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "is_completed",
+        "type": "bool",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "completed_date",
+        "type": "date",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "is_in_progress",
+        "type": "bool",
+        "required": false,
+        "options": {}
+      },
+      {
+        "name": "progress",
+        "type": "json",
+        "required": false,
+        "options": {}
+      }
+    ],
+    "listRule": "user_id = @request.auth.id",
+    "viewRule": "user_id = @request.auth.id",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "user_id = @request.auth.id",
+    "deleteRule": "user_id = @request.auth.id"
+  })
+
+  return app.save(collection)
+}, (app) => {
+  // Down migration - remove workouts collection
+  const collection = app.findCollectionByNameOrId("workouts")
+  return app.delete(collection)
+})
